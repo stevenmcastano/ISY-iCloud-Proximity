@@ -1,0 +1,4 @@
+logs
+logs/*
+
+conf/*.ini

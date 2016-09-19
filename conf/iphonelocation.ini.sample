@@ -1,0 +1,74 @@
+[database]
+# You can name this anything you'd like, it's the database log of all your location points/data
+database = iphonelocation
+# This is the host running MySQL (or compatibale, MariaDB or Percona for example)
+host = 127.0.0.1
+# The port MySQL is configure to listen on, if you haven't changed the default, it's 3306
+port = 3306
+# The MySQL username that has access to this database
+user = dbusername
+# The MySQL users password
+passwd = Sup3rSecre7
+
+[ISY]
+# The ISY username
+username = admin
+# The ISY password
+password = passwd
+# The ISY hostname or IP
+hostname = 111.222.333.444
+# Set this to "True" to use SSL (https)
+SSL = False
+# This is the port your http or https connection listens on
+port = 80
+
+
+[iCloudAPI]
+# Your iCloud username
+username = myicloudname@icloud.com
+# Your iCloud password
+password = c00lpa$$w0rd
+
+[device]
+# The name of the person whose device this is
+name = Steve
+# A 3 letter/number short name for the person this device belongs to
+shortname = STV
+# The number of the ISY varible used to store the current distance
+ISYDistanceVAR = 47
+# The device identifier of this device. See the README for instructions to get this
+iCloudGUID = GHbTA***ITSBIGANDLONG***SUzmWV
+# The lattitude of your home location
+location_home_lat = 34.963144
+# The longitude of your home location
+location_home_long = -72.089345
+
+##########################################################################################
+### Advanced Settings - There is no need to change anything below this line,           ###
+###    the application will run fine with all of these settings left at the defaults   ###
+###    set below.																	   ###
+##########################################################################################
+# Turn on or off checking your ISY for WiFi presence
+WiFiCheck = True
+# Turn on or off checking your ISY for Bluetooth presence
+BTCheck = True
+# The ISY variable that stores your WiFi presence info
+ISYWifiVAR = 48
+# The ISY variable that stores your Bluetooth presence info
+ISYBtVAR = 25
+
+[general]
+# The number of devices we're checking. (For now this should always be 1)
+numberofdevices = 1
+# The default sleep time between API location lookups
+cycle_sleep_default = 60
+# The sleep time between API location lookups if you have WiFi or Bluetooth checking enabled
+cycle_sleep_withradio = 300
+# The distance in miles outside of which API lookups become less frequent
+cycle_sleep_distance = 5
+# The minimum change in distance from home to be considered motion
+cycle_sleep_variable_distance = .5
+# The sleep modifier if you are not moving, or moving away from home.
+cycle_sleep_variable_modifier_default = 2
+# The sleep modifier if you are getting closer to home.
+cycle_sleep_variable_modifier_inbound = 4
