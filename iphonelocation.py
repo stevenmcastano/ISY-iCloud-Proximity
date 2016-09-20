@@ -431,7 +431,7 @@ while True:
 		if exit_code == 0:
 			if isy_wifi_present == 1:
 				iPhone_WiFi_Here = True
-				logger.debug("MAIN - iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
+			logger.debug("MAIN - iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
 		else:
 			logger.debug("MAIN - isy_variable returned and error, leaving iPhone_WiFi_Here as: {}".format(iPhone_WiFi_Here))
 	else:
