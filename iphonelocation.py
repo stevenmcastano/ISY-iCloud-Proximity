@@ -159,74 +159,109 @@ except:
 ## CONFIGURATION VARIABLES                                                                                 #
 ############################################################################################################
 #
-### Check to see if config file exists:
-if os.path.isfile("./conf/iphonelocation.ini"):
-	logger.debug('MAIN - iphonelocation.ini exists, continuing.')
-else:
-	logger.error("MAIN - iphonelocation.ini does not exist or can't be read. Exiting!")
-	exit()
-	
 ### Read configuratoin items:
 try:
-	parser = SafeConfigParser()
-	parser.read('./conf/iphonelocation.ini')
-	### Grab the database connection settings:
-	global db_conf
-	db_conf = {}
-	db_conf['name'] = parser.get('database', 'database')
-	db_conf['host'] = parser.get('database', 'host')
-	db_conf['port'] = int(parser.get('database', 'port'))
-	db_conf['user'] = parser.get('database', 'user')
-	db_conf['passwd'] = parser.get('database', 'passwd')
-	logger.debug('MAIN - db_conf: {}'.format(db_conf))
-	### Grab the ISY connection settings:
-	global isy_conf
-	isy_conf = {}
-	isy_conf['username'] = parser.get('ISY', 'username')
-	isy_conf['password'] = parser.get('ISY', 'password')
-	isy_conf['hostname'] = parser.get('ISY', 'hostname')
-	isy_conf['port'] = int(parser.get('ISY', 'port'))
-	isy_conf['SSL'] = parser.get('ISY', 'SSL')
-	logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
-	### Grab the iCloud API authentication settings:
-	global icloudapi_conf
-	icloudapi_conf = {}
-	icloudapi_conf['username'] = parser.get('iCloudAPI', 'username')
-	icloudapi_conf['password'] = parser.get('iCloudAPI', 'password')
-	logger.debug('MAIN - icloudapi_conf: {}'.format(icloudapi_conf))
-	### Grab general options:
-	global general_conf
-	general_conf = {}
-	general_conf['numberofdevices'] = int(parser.get('general', 'numberofdevices'))
-	general_conf['cycle_sleep_default'] = float(parser.get('general', 'cycle_sleep_default'))
-	general_conf['cycle_sleep_withradio'] = float(parser.get('general', 'cycle_sleep_withradio'))
-	general_conf['cycle_sleep_distance'] = float(parser.get('general', 'cycle_sleep_distance'))
-	general_conf['cycle_sleep_variable_distance'] = float(parser.get('general', 'cycle_sleep_variable_distance'))
-	general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
-	general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
-	logger.debug('MAIN - general_conf: {}'.format(general_conf))
-	### Grab the device settings:
-	global device_conf
-	device_conf = {}
-	device_conf['name'] = parser.get('device', 'name')
-	device_conf['shortname'] = parser.get('device', 'shortname')
-	device_conf['WiFiCheck'] = parser.get('device', 'WiFiCheck')
-	device_conf['BTCheck'] = parser.get('device', 'BTCheck')
-	device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
-	device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
-	device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
-	device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
-	device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
-	device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
-	device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
-	device_conf['location_home_long'] = parser.get('device', 'location_home_long')
-	logger.debug('MAIN - device_conf: {}'.format(device_conf))
-except:
-	logger.error('MAIN - Reading settings from iphonelocation.ini failed. Exiting!', exc_info = True)
-	exit()
+	### Check to see if config file exists:
+	if os.path.isfile("./conf/iphonelocation.ini"):
+		logger.debug('MAIN - iphonelocation.ini exists, continuing.')
+	else:
+		logger.error("MAIN - iphonelocation.ini does not exist or can't be read. Exiting!")
+		exit()
 	
+	try:
+		parser = SafeConfigParser()
+		parser.read('./conf/iphonelocation.ini')
+		### Grab the database connection settings:
+		global db_conf
+		db_conf = {}
+		db_conf['name'] = parser.get('database', 'database')
+		db_conf['host'] = parser.get('database', 'host')
+		db_conf['port'] = int(parser.get('database', 'port'))
+		db_conf['user'] = parser.get('database', 'user')
+		db_conf['passwd'] = parser.get('database', 'passwd')
+		logger.debug('MAIN - db_conf: {}'.format(db_conf))
+	except:
+		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [database] section. You may need to start wiith a new .ini \
+					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+					 Exiting!', exc_info = True)
+		exit()
+	try:
+		### Grab the ISY connection settings:
+		global isy_conf
+		isy_conf = {}
+		isy_conf['username'] = parser.get('ISY', 'username')
+		isy_conf['password'] = parser.get('ISY', 'password')
+		isy_conf['hostname'] = parser.get('ISY', 'hostname')
+		isy_conf['port'] = int(parser.get('ISY', 'port'))
+		isy_conf['SSL'] = parser.get('ISY', 'SSL')
+		logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
+	except:
+		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [ISY] section. You may need to start wiith a new .ini \
+					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+					 Exiting!', exc_info = True)
+		exit()
+	try:
+		### Grab the iCloud API authentication settings:
+		global icloudapi_conf
+		icloudapi_conf = {}
+		icloudapi_conf['username'] = parser.get('iCloudAPI', 'username')
+		icloudapi_conf['password'] = parser.get('iCloudAPI', 'password')
+		logger.debug('MAIN - icloudapi_conf: {}'.format(icloudapi_conf))
+	except:
+		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [iCloudAPI] section. You may need to start wiith a new .ini \
+					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+					 Exiting!', exc_info = True)
+		exit()
+	try:
+		### Grab general options:
+		global general_conf
+		general_conf = {}
+		general_conf['numberofdevices'] = int(parser.get('general', 'numberofdevices'))
+		general_conf['cycle_sleep_default'] = float(parser.get('general', 'cycle_sleep_default'))
+		general_conf['cycle_sleep_withradio'] = float(parser.get('general', 'cycle_sleep_withradio'))
+		general_conf['cycle_sleep_distance'] = float(parser.get('general', 'cycle_sleep_distance'))
+		general_conf['cycle_sleep_variable_distance'] = float(parser.get('general', 'cycle_sleep_variable_distance'))
+		general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
+		general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
+		logger.debug('MAIN - general_conf: {}'.format(general_conf))
+	except:
+		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
+					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+					 Exiting!', exc_info = True)
+		exit()
+	try:
+		### Grab the device settings:
+		global device_conf
+		device_conf = {}
+		device_conf['name'] = parser.get('device', 'name')
+		device_conf['shortname'] = parser.get('device', 'shortname')
+		device_conf['WiFiCheck'] = parser.get('device', 'WiFiCheck')
+		device_conf['BTCheck'] = parser.get('device', 'BTCheck')
+		device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
+		device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
+		device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
+		device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
+		device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
+		device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
+		device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
+		device_conf['location_home_long'] = parser.get('device', 'location_home_long')
+		logger.debug('MAIN - device_conf: {}'.format(device_conf))
+	except:
+		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [device] section. You may need to start wiith a new .ini \
+					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+					 Exiting!', exc_info = True)
+		exit()
+except:
+	logger.error('MAIN - Error reading settings from iphonelocation.ini. You may need to start wiith a new .ini \
+					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+					 Exiting!', exc_info = True)
+	exit()
 ### Connect to MySQL database for logging:
-db = pw.MySQLDatabase(db_conf['name'], host=db_conf['host'], port=db_conf['port'], user=db_conf['user'], passwd=db_conf['passwd'])
+try:
+	db = pw.MySQLDatabase(db_conf['name'], host=db_conf['host'], port=db_conf['port'], user=db_conf['user'], passwd=db_conf['passwd'])
+except:
+	logger.error('MAIN - Error connecting to your MySQL database. Please check your database configuration and/or MySQL server.', exc_info=True)
+	exit()
 #
 ############################################################################################################
 ## ENVIRONMENT SETUP                                                                                       #
@@ -273,7 +308,7 @@ db.close()
 ############################################################################################################
 ## FUNCTION DEFINITIONS                                                                                    #
 ############################################################################################################
-#
+### Fuction that gets and sets ISY variable values:
 def isy_variable(action, var_type, var_number, value):
 	try:
 		logger.debug("ISY_VARIABLE - Running...")
@@ -364,14 +399,14 @@ def isy_variable(action, var_type, var_number, value):
 	except:
 		logger.debug("ISY_VARIABLE - Failed!", exc_info=True)
 		return 1, -1
-#
+### Function to automatically restart the application if some unrecoverable error occurs:
 def program_restart():
 	logger.info('RESTART - Executing restart...')
 	logger.debug('RESTART - Pause for 10 seconds to settle.')
 	time.sleep(10)
 	python = sys.executable
 	os.execl(python, python, * sys.argv)
-#
+### Fuction to authenticate to the iCloud API:
 def api_login():
 	try:
 		global api
@@ -386,12 +421,75 @@ def api_login():
 	except:
 		logger.warn('API_LOGIN - Authentication to iCloud API failed.', exc_info=True)
 	return
-#
+### Function to print the table header of data to the screen:
 def print_table_header():
 	### Print out an initial table heading:
+	logger.info("|---------------------+-------+-----------+------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
 	logger.info("| Timestamp           |DataAge| DistHome  | ISY  | Latitude        | Longitude       | HorizAccuracy |PositionType|LocType|LocFin | isOld |isInacc|")
 	logger.info("|---------------------+-------+-----------+------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
+### Function to do radio checks for WiFi and Bluetooth:
+def individual_radio_check(var, expected_value):
+	try:
+		logger.debug('INDIVIDUAL_RADIO_CHECK - Running ISY_VARIABLE function.')
+		exit_code, returned_value = isy_variable('get', 'state', var, '')
+		if exit_code == 0:
+			logger.debug('INDIVIDUAL_RADIO_CHECK - ISY_VARIABLE function ran properly.')
+			if returned_value == expected_value:
+				logger.debug('INDIVIDUAL_RADIO_CHECK - The radio check was true, returning.')
+				return 0, True
+			elif returned_value != expected_value:
+				logger.debug('INDIVIDUAL_RADIO_CHECK - The radio check was False, returning.')
+				return 0, False
+			if returned_value == expected_value:
+				logger.warn('INDIVIDUAL_RADIO_CHECK - The radio check could not determine true or false, retuning with an error.')
+				return 1, False
+	except:
+		logger.error('INDIVIDUAL_RADIO_CHECK - The radio check failed, returning with an error.', exc_info=True)
+		return 1, False
+### Function to do radio checks:
+def radio_check():
+	try:
+		logger.debug('RADIO_CHECK - Running...')
+		
+		### Wifi checking:
+		if device_conf['WiFiCheck'] == 'True':
+			### Read the value of the wifi present variable:
+			logger.debug('RADIO_CHECK - Checking to see if the iPhone is present on WiFi...')
+			exit_code, iPhone_WiFi_Here = individual_radio_check(device_conf['ISYWifiVAR'], device_conf['ISYWifiVAR_Expected'])
+			if exit_code == 0:
+				logger.debug("RADIO_CHECK - iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
+			else:
+				iPhone_WiFi_Here = False
+				logger.debug("RADIO_CHECK - Reading WiFi value failed, using default value. iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
+		else:
+			iPhone_WiFi_Here = False
+			logger.debug('RADIO_CHECK - Script is not set to check for WiFi proximity, continuing...')
 
+		### Bluetooth checking:
+		if device_conf['BTCheck'] == 'True':
+			### Read the value of the wifi present variable:
+			logger.debug('RADIO_CHECK - Checking to see if the iPhone is present on Bluetooth...')
+			exit_code, iPhone_BT_Here = individual_radio_check(device_conf['ISYBtVAR'], device_conf['ISYBtVAR_Expected'])
+			if exit_code == 0:
+				logger.debug("RADIO_CHECK - iPhone_BT_Here: {}".format(iPhone_BT_Here))
+			else:
+				iPhone_BT_Here = False
+				logger.debug("RADIO_CHECK - Reading WiFi value failed, using default value. iPhone_BT_Here: {}".format(iPhone_BT_Here))
+		else:
+			iPhone_BT_Here = False
+			logger.debug('RADIO_CHECK - Script is not set to check for Bluetooth proximity, continuing...')
+
+		
+		### Return radio status.
+		if iPhone_WiFi_Here or iPhone_BT_Here:
+			logger.debug('RADIO_CHECK - the iOS device is in radio range.')
+			return True
+		else:
+			logger.debug('RADIO_CHECK - the iOS device is not in radio range.')
+			return False
+	except:
+		logger.warn('RADIO_CHECK - Failed. Returning False.', exc_info=True)
+		return False
 ############################################################################################################
 ## THREAD DEFINITIONS                                                                                      #
 ############################################################################################################
@@ -420,50 +518,10 @@ distance_home_delta = 0
 ### Run the main script loop:
 while True:
 	logger.debug('MAIN - Loop Number: {}'.format(loop_number))
-
-	### Before each interval determine if the device is in range via wifi and bluetooth
-	### Reset the radio value to false
-	iPhone_WiFi_Here = False
-	iPhone_BT_Here = False
-	### If the app is set to check for WiFi proximity:
-	if device_conf['WiFiCheck'] == 'True':
-		### Read the value of the wifi present variable:
-		logger.debug('MAIN - Checking to see if the iPhone is present on WiFi...')
-		exit_code, isy_wifi_present = isy_variable('get', 'state', device_conf['ISYWifiVAR'], '')
-		if exit_code == 0:
-			if isy_wifi_present == device_conf['ISYWifiVAR_Expected']:
-				iPhone_WiFi_Here = True
-			logger.debug("MAIN - iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
-		else:
-			logger.debug("MAIN - isy_variable returned and error, leaving iPhone_WiFi_Here as: {}".format(iPhone_WiFi_Here))
-	else:
-		logger.debug('MAIN - Script is not set to check for WiFi proximity, continuing...')
-		
-	### If the ap is set to check for BT proximity:
-	if device_conf['BTCheck'] == 'True':
-		### Read the value of the bluetooth present variable
-		logger.debug('MAIN - Checking to see if the iPhone is present via Bluetooth...')
-		exit_code, isy_bt_gone = isy_variable('get', 'state', device_conf['ISYBtVAR'], '')
-		if exit_code == 0:
-			if isy_bt_gone == device_conf['ISYBtVAR_Expected']:
-				iPhone_BT_Here = True
-			logger.debug("MAIN - iPhone_BT_Here: {}".format(iPhone_BT_Here))
-		else:
-			logger.debug("MAIN - isy_variable returned and error, leaving iPhone_BT_Here: {}".format(iPhone_BT_Here))
-	else:
-		logger.debug('MAIN - Script is not set to check for Bluetooth proximity, continuing...')
-		
-	iPhone_RadioInRange = False
-	### Run this only if WiFi or BT checking is set to true:
-	if device_conf['WiFiCheck'] or device_conf['BTCheck']:
-		### Check to see if wifi or bluetooth is present:
-		if iPhone_WiFi_Here or iPhone_BT_Here:
-			### If they one of them is, set variable to True:
-			iPhone_RadioInRange = True
-		
-	### Tell us what happened:
-	logger.debug("MAIN - The set value of iPhone_RadioInRange is {}".format(iPhone_RadioInRange))
 	
+	### Check to see if the device is in radio range:
+	iPhone_RadioInRange = radio_check()
+
 	### Run the rest of the loop only if the iPhone is out of radio range:
 	if not iPhone_RadioInRange:
 		logger.debug("MAIN - iPhone is not in radio range or WiFi and BT checking is disabled, checking GPS...")
@@ -530,15 +588,16 @@ while True:
 						str(iPhone_Location['isInaccurate']).ljust(5)
 						))
 			
-			### Every 30 rounds, output the table heading
+			### Redisplay the table heading at a certain interval.
 			if interval == 0:
-				print_table_header
+				print_table_header()
 				### Increase the interval showing we've printed out a line.
 				interval = interval + 1
 			else:
 				### Skip printing the table output and increment the interval.
 				interval = interval + 1
-				if interval == 30:
+				logger.debug('MAIN - Table display interval: {}'.format(interval))
+				if interval == 20:
 					interval = 0
 				else:
 					pass
@@ -640,12 +699,13 @@ while True:
 				api_login()
 			else:
 				logger.error("MAIN - Reading the iCloud iPhone location from API failed! Max failed attempts reached, restarting the application.", exc_info=True)
-				program_restart()
-				
-		
+				program_restart()	
 	else:
-		logger.debug("MAIN - iPhone is in radio range, sleeping for {} seconds.".format(general_conf['cycle_sleep_withradio']))
+		logger.debug("MAIN - iPhone_RadioInRange is {}, sleeping for {} seconds.".format(
+			iPhone_RadioInRange, general_conf['cycle_sleep_withradio']))
 		time.sleep(general_conf['cycle_sleep_withradio'])
+
+	### Increase the loop number showing how many times the checking cycle has run:
 	loop_number = loop_number + 1
 	###### END OF THE WHILE LOOP ######
 

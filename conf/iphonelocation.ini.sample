@@ -49,9 +49,9 @@ location_home_long = -72.089345
 ###    set below.																	   ###
 ##########################################################################################
 # Turn on or off checking your ISY for WiFi presence
-WiFiCheck = True
+WiFiCheck = False
 # Turn on or off checking your ISY for Bluetooth presence
-BTCheck = True
+BTCheck = False
 # The ISY variable that stores your WiFi presence info
 ISYWifiVAR = 48
 # The expect value of the ISY WiFi tracking value
