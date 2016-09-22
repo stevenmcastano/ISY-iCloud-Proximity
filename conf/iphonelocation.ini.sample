@@ -54,8 +54,12 @@ WiFiCheck = True
 BTCheck = True
 # The ISY variable that stores your WiFi presence info
 ISYWifiVAR = 48
+# The expect value of the ISY WiFi tracking value
+ISYWifiVAR_Expected = 1
 # The ISY variable that stores your Bluetooth presence info
 ISYBtVAR = 25
+# The expect value of the ISY Bluetooth tracking value
+ISYBtVAR_Expected = 0
 
 [general]
 # The number of devices we're checking. (For now this should always be 1)

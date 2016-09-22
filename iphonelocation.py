@@ -213,7 +213,9 @@ try:
 	device_conf['WiFiCheck'] = parser.get('device', 'WiFiCheck')
 	device_conf['BTCheck'] = parser.get('device', 'BTCheck')
 	device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
+	device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
 	device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
+	device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
 	device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
 	device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
 	device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
@@ -358,10 +360,10 @@ def isy_variable(action, var_type, var_number, value):
 			return 0, int(isy_response_status)
 		
 		logger.debug("ISY_VARIABLE - Completed")
-		return 1, _
+		return 1, -1
 	except:
 		logger.debug("ISY_VARIABLE - Failed!", exc_info=True)
-		return 1, _
+		return 1, -1
 #
 def program_restart():
 	logger.info('RESTART - Executing restart...')
@@ -429,7 +431,7 @@ while True:
 		logger.debug('MAIN - Checking to see if the iPhone is present on WiFi...')
 		exit_code, isy_wifi_present = isy_variable('get', 'state', device_conf['ISYWifiVAR'], '')
 		if exit_code == 0:
-			if isy_wifi_present == 1:
+			if isy_wifi_present == device_conf['ISYWifiVAR_Expected']:
 				iPhone_WiFi_Here = True
 			logger.debug("MAIN - iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
 		else:
@@ -443,7 +445,7 @@ while True:
 		logger.debug('MAIN - Checking to see if the iPhone is present via Bluetooth...')
 		exit_code, isy_bt_gone = isy_variable('get', 'state', device_conf['ISYBtVAR'], '')
 		if exit_code == 0:
-			if isy_bt_gone == 0:
+			if isy_bt_gone == device_conf['ISYBtVAR_Expected']:
 				iPhone_BT_Here = True
 			logger.debug("MAIN - iPhone_BT_Here: {}".format(iPhone_BT_Here))
 		else:
@@ -495,7 +497,7 @@ while True:
 			distance_home = vincenty(location_home, location_phone).miles
 			
 			### Determine the change in distance:
-			distance_home_delta = distance_home_previous - distance_home
+			distance_home_delta = distance_home - distance_home_previous
 			logger.debug("MAIN - distance_home_delta: {}".format(distance_home_delta))
 			
 			### Debug output of the iphones location info and it's distance from home.
@@ -572,8 +574,8 @@ while True:
 			if distance_home > general_conf['cycle_sleep_distance']:
 				### If the distance has change more than the sleep variable distance, check if the device is getting closer or farther away:
 				if abs(distance_home_delta) > general_conf['cycle_sleep_variable_distance']:
-					logger.debug("MAIN - The distance to home has change by more then {} miles, using variable sleep distance.".format(
-						general_conf['cycle_sleep_variable_distance']))
+					logger.debug("MAIN - The distance to home has change by more then {} miles, using variable sleep distance. It is: {}".format(
+						general_conf['cycle_sleep_variable_distance', distance_home_delta]))
 					### If the distance change is positive (getting farther away) use the default sleep time.
 					if distance_home_delta > 0:
 						logger.debug("MAIN - The distance to home delta is positive, we're getting farther away. Using {} as the sleep modifier.".format(
