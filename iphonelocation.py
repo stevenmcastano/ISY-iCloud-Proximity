@@ -48,11 +48,11 @@ try:
 	application_logging_name = 'iPhoneLocation'
 	pid = os.getpid()
 	print "Startup: PID={}".format(pid)
-	#f_out = open('/var/run/{}.pid'.format(application_logging_name), 'w', 0)
-	#f_out.write(str(pid))
-	#f_out.flush
-	#f_out.close
-	#print "Startup: Created pidfile at /var/run/{}.pid".format(application_logging_name)
+	f_out = open('/tmp/{}.pid'.format(application_logging_name), 'w', 0)
+	f_out.write(str(pid))
+	f_out.flush
+	f_out.close
+	print "Startup: Created pidfile at /tmp/{}.pid".format(application_logging_name)
 	try:
 		proc = subprocess.Popen(['git', 'describe'], stdout=subprocess.PIPE)
 		service_version = proc.communicate()[0].strip()
@@ -709,6 +709,6 @@ while True:
 	loop_number = loop_number + 1
 	###### END OF THE WHILE LOOP ######
 
-#logger.info('MAIN - Removing pidfile: /var/run/{}.pid'.format(application_logging_name))
-#os.remove('/var/run/{}.pid'.format(application_logging_name))
+logger.info('MAIN - Removing pidfile: /var/run/{}.pid'.format(application_logging_name))
+os.remove('/tmp/{}.pid'.format(application_logging_name))
 logger.info('MAIN - Exiting.')
