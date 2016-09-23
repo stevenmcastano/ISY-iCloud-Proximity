@@ -1,5 +1,11 @@
 # ISY-iCloud-Proximity
 
+<h4>Current Build Status:</h4>
+Master:<br>
+![Build Status Graphic](https://travis-ci.org/stevenmcastano/ISY-iCloud-Proximity.svg?branch=master "current build status")<br>
+Dev:<br>
+![Build Status Graphic](https://travis-ci.org/stevenmcastano/ISY-iCloud-Proximity.svg?branch=dev "current build status")<br>
+
 <h4>Overview:</h4>
 This python script reads your iOS device location from iCloud, calculates your distance to home and store that distance as a variable in a unviersal devices ISY contoller.
 
