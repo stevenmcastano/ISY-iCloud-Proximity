@@ -633,8 +633,8 @@ while True:
 			if distance_home > general_conf['cycle_sleep_distance']:
 				### If the distance has change more than the sleep variable distance, check if the device is getting closer or farther away:
 				if abs(distance_home_delta) > general_conf['cycle_sleep_variable_distance']:
-					logger.debug("MAIN - The distance to home has change by more then {} miles, using variable sleep distance. It is: {}".format(
-						general_conf['cycle_sleep_variable_distance', distance_home_delta]))
+					#logger.debug("MAIN - The distance to home has change by more then {} miles, using variable sleep distance. It is: {}".format(
+						#general_conf['cycle_sleep_variable_distance', distance_home_delta]))
 					### If the distance change is positive (getting farther away) use the default sleep time.
 					if distance_home_delta > 0:
 						logger.debug("MAIN - The distance to home delta is positive, we're getting farther away. Using {} as the sleep modifier.".format(
@@ -687,7 +687,9 @@ while True:
 				db.close()
 			except:
 				logger.warn('MAIN - DB entry failed.', exc_info = True)
-			
+
+			### Reset the number of failed attempts after one works:
+			failed_attempts = 0	
 			time.sleep(int(sleep_time))
 			
 		except:
