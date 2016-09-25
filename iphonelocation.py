@@ -563,7 +563,11 @@ while True:
 			distance_home = vincenty(location_home, location_phone).miles
 			
 			### Store the distance to home with precision
-			distance_home_precision = float("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
+			if general_conf['isy_distance_precision'] == 0:
+				logger.debug("MAIN - isy_distance_precision is 0, making the variable an integer.")
+				distance_home_precision = int("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
+			else:
+				distance_home_precision = float("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
 			
 			### Determine the change in distance:
 			distance_home_delta = distance_home - distance_home_previous
