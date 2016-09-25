@@ -231,6 +231,7 @@ try:
 		general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
 		general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
 		general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
+		general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
@@ -563,11 +564,20 @@ while True:
 			distance_home = vincenty(location_home, location_phone).miles
 			
 			### Store the distance to home with precision
-			if general_conf['isy_distance_precision'] == 0:
+			if general_conf['isy_distance_precision'] == 0 and general_conf['isy_distance_multiplier'] == 0:
 				logger.debug("MAIN - isy_distance_precision is 0, making the variable an integer.")
 				distance_home_precision = int("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
+			elif general_conf['isy_distance_precision'] == 0 and general_conf['isy_distance_multiplier'] != 0:
+				logger.debug("MAIN - isy_distance_precision is 0 but a multiplier is being used")
+				distance_home_precision = int(distance_home * general_conf['isy_distance_multiplier'])
+			elif general_conf['isy_distance_precision'] != 0 and general_conf['isy_distance_multiplier'] == 0:
+				logger.debug("MAIN - isy_distance_precision is being used and the multiplier is 0")
+				distance_home_precision = "{:.{}f}".format(distance_home, general_conf['isy_distance_precision'])
 			else:
-				distance_home_precision = float("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
+				logger.warn("MAIN - Both distance precision and multiplier are both set, at least one should be set to '0'")
+				distance_home_precision = int(distance_home)
+				
+				
 			
 			### Determine the change in distance:
 			distance_home_delta = distance_home - distance_home_previous

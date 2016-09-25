@@ -80,3 +80,9 @@ cycle_sleep_variable_modifier_inbound = 4
 # **NOTE: You must be running firmware v5.0.x or above to use this option. By default
 #         it should be left at 0.
 isy_distance_precision = 0
+# This multiplies the distance reported to the ISY by the value below. This is done for ISY
+# units running firmware earlier than v5.0.x so they can have more precise distance actions.
+# For example, if the setting below is set to 100, a distance of 23.12345678 miles, with the
+# above precision setting left set at 0, will report it's distance to the ISY as 2312. This
+# basically means your distance is 2312 100ths of a mile.
+isy_distance_multiplier = 0
