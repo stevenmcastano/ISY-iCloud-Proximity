@@ -76,3 +76,7 @@ cycle_sleep_variable_distance = .5
 cycle_sleep_variable_modifier_default = 2
 # The sleep modifier if you are getting closer to home.
 cycle_sleep_variable_modifier_inbound = 4
+# Distance precision, i.e. how many decimal places of distance to report to the ISY.
+# **NOTE: You must be running firmware v5.0.x or above to use this option. By default
+#         it should be left at 0.
+isy_distance_precision = 0

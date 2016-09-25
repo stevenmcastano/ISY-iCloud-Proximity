@@ -168,6 +168,7 @@ try:
 		logger.error("MAIN - iphonelocation.ini does not exist or can't be read. Exiting!")
 		exit()
 	
+	### Read database configuration:
 	try:
 		parser = SafeConfigParser()
 		parser.read('./conf/iphonelocation.ini')
@@ -185,6 +186,8 @@ try:
 					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
 					 Exiting!', exc_info = True)
 		exit()
+	
+	### Read ISY configuration:	
 	try:
 		### Grab the ISY connection settings:
 		global isy_conf
@@ -200,6 +203,8 @@ try:
 					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
 					 Exiting!', exc_info = True)
 		exit()
+
+	### Read the iCloud configuration:
 	try:
 		### Grab the iCloud API authentication settings:
 		global icloudapi_conf
@@ -212,6 +217,8 @@ try:
 					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
 					 Exiting!', exc_info = True)
 		exit()
+
+	### Read the general program options:
 	try:
 		### Grab general options:
 		global general_conf
@@ -223,6 +230,7 @@ try:
 		general_conf['cycle_sleep_variable_distance'] = float(parser.get('general', 'cycle_sleep_variable_distance'))
 		general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
 		general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
+		general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
@@ -424,9 +432,9 @@ def api_login():
 ### Function to print the table header of data to the screen:
 def print_table_header():
 	### Print out an initial table heading:
-	logger.info("|---------------------+-------+-----------+------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
-	logger.info("| Timestamp           |DataAge| DistHome  | ISY  | Latitude        | Longitude       | HorizAccuracy |PositionType|LocType|LocFin | isOld |isInacc|")
-	logger.info("|---------------------+-------+-----------+------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
+	logger.info("|---------------------+-------+------------------+--------------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
+	logger.info("| Timestamp           |DataAge| DistHome (miles) | ISY          | Latitude        | Longitude       | HorizAccuracy |PositionType|LocType|LocFin | isOld |isInacc|")
+	logger.info("|---------------------+-------+------------------+--------------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
 ### Function to do radio checks for WiFi and Bluetooth:
 def individual_radio_check(var, expected_value):
 	try:
@@ -554,6 +562,9 @@ while True:
 			### Determine the distance in miles between the iPhone and "Home"
 			distance_home = vincenty(location_home, location_phone).miles
 			
+			### Store the distance to home with precision
+			distance_home_precision = float("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
+			
 			### Determine the change in distance:
 			distance_home_delta = distance_home - distance_home_previous
 			logger.debug("MAIN - distance_home_delta: {}".format(distance_home_delta))
@@ -570,14 +581,16 @@ while True:
 			logger.debug("MAIN - Data Age: {} seconds".format(data_age))
 			
 			### Set the distance to home display:
-			distance_home_display = "{:.4f}".format(distance_home)
+			#distance_home_display = "{:.{}f}".format(distance_home, general_conf['isy_distance_precision'])
+			#distance_home_display = "{}".format(round(distance_home, general_conf['isy_distance_precision']))
+			
 			
 			### Print a line of the table with all needed info regarding the location process
 			logger.info("| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
 						str(iPhone_Location_Time).ljust(19),
 						str(int(data_age)).ljust(5),
-						str(distance_home_display).ljust(9),
-						str(int(distance_home)).ljust(4),
+						str(distance_home).ljust(16),
+						str(distance_home_precision).ljust(12),
 						str(iPhone_Location['latitude']).ljust(15),
 						str(iPhone_Location['longitude']).ljust(15),
 						str(iPhone_Location['horizontalAccuracy']).ljust(13),
@@ -608,15 +621,15 @@ while True:
 			else:
 				logger.debug("MAIN - iPhone location data is old.")
 				
-			if distance_home_previous == int(distance_home):
+			if distance_home_previous == distance_home_precision:
 				logger.debug("MAIN - The distance from home hasn't changed, moving on.")
 				isy_updated = False
 				pass
 			else:
-				logger.debug("MAIN - The distance from home has changed. It was {}, now it's {}, updating the ISY.".format(distance_home_previous, int(distance_home)))
+				logger.debug("MAIN - The distance from home has changed. It was {}, now it's {}, updating the ISY.".format(distance_home_previous, distance_home_precision))
 				### Set the following ISY variable
 				#isy_PX_Steve_Distance_From_Home.value = int(distance_home)
-				exit_code, isy_status = isy_variable('set', 'state', device_conf['ISYDistanceVAR'], int(distance_home))
+				exit_code, isy_status = isy_variable('set', 'state', device_conf['ISYDistanceVAR'], distance_home_precision)
 				if exit_code != 0 or isy_status != 200:
 					logger.warn("MAIN - Updating the ISY failed, will try again next loop.")
 					isy_updated = False
@@ -624,7 +637,7 @@ while True:
 					### Set the previous variable
 					isy_updated = True
 					logger.debug("MAIN - Recording the distance_home_previous variable.")
-					distance_home_previous = int(distance_home)
+					distance_home_previous = distance_home_precision
 			
 			### Sleep between checking cycles
 			# Default sleep time:
@@ -677,7 +690,7 @@ while True:
 					'iCloud_isOld': iPhone_Location['isOld'],
 					'iCloud_isInaccurate': iPhone_Location['isInaccurate'],
 					'App_ISYUpdated': isy_updated,
-					'App_ISYUpdateValue': int(distance_home),
+					'App_ISYUpdateValue': distance_home_precision,
 					'App_SleepTime': int(sleep_time),
 					'App_FailedAttempts': failed_attempts,
 					'App_LoopNumber': loop_number
