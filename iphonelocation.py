@@ -22,10 +22,11 @@ import peewee as pw
 ### iCloud imports:
 try:
 	from pyicloud import PyiCloudService
+	import click
 except:
 	print "Startup: Failed to import the pyicloud library. Please make sure it's installed. You can try 'pip install pyicloud'."
 	exit()
-	
+
 ### Programatic stuff
 import json, urllib2, xmltodict
 from collections import OrderedDict
@@ -421,12 +422,24 @@ def program_restart():
 ### Fuction to authenticate to the iCloud API:
 def api_login():
 	try:
+		### Make variables global to share data across functions:
 		global api
 		global api_last_used_time
+		
+		### Clear any current login data/tokens:
 		logger.debug('API_LOGIN - Clearing the current login data.')
 		api = None
-		logger.debug('API_LOGIN - Authenticatin to the iCloud API.')
+		
+		### Authenticate to the iCloud API and populate the 'api' variable:
+		logger.debug('API_LOGIN - Authenticating to the iCloud API.')
 		api = PyiCloudService(icloudapi_conf['username'], icloudapi_conf['password'])
+
+		### Check to see if they API requested 2 factor authentication:
+		if api.requires_2fa:
+			twofa_auth()
+		else:
+			pass
+	
 		api_last_used_time = datetime.datetime.now()
 		logger.debug('API_LOGIN - Sleep for 3 seconds to let login process.')
 		time.sleep(3)
@@ -601,7 +614,33 @@ def device_data_read():
 	except:
 		logger.debug('DEVICE_DATA_READ - Failed!', exc_info=True)
 		return 1, 0
-		
+### Fuction to capture 2 factor auth requests:
+def twofa_auth():
+	try:
+		logger.debug('2FA_AUTH - Running...')
+		print "Two-factor authentication required. Your trusted devices are:"
+	
+		devices = api.trusted_devices
+		for i, device in enumerate(devices):
+			print "  %s: %s" % (i, device.get('deviceName',
+				"SMS to %s" % device.get('phoneNumber')))
+	
+		device = click.prompt('Which device would you like to use?', default=0)
+		device = devices[device]
+		if not api.send_verification_code(device):
+			print "Failed to send verification code"
+			sys.exit(1)
+	
+		code = click.prompt('Please enter validation code')
+		if not api.validate_verification_code(device, code):
+			print "Failed to verify verification code"
+			sys.exit(1)
+				
+		logger.debug('2FA_AUTH - Completed.')
+		return 0
+	except:
+		logger.debug('2FA_AUTH - Failed!', exc_info=True)
+		return 1
 ############################################################################################################
 ## THREAD DEFINITIONS                                                                                      #
 ############################################################################################################
@@ -674,14 +713,14 @@ while True:
 					distance_home_precision = int(distance_home * general_conf['isy_distance_multiplier'])
 				elif general_conf['isy_distance_precision'] != 0 and general_conf['isy_distance_multiplier'] == 0:
 					logger.debug("MAIN - isy_distance_precision is being used and the multiplier is 0")
-					distance_home_precision = "{:.{}f}".format(distance_home, general_conf['isy_distance_precision'])
+					distance_home_precision = float("{:.{}f}".format(distance_home, general_conf['isy_distance_precision']))
 				else:
 					logger.warn("MAIN - Both distance precision and multiplier are both set, at least one should be set to '0'")
 					distance_home_precision = int(distance_home)
 				
-				
-			
 				### Determine the change in distance:
+				logger.debug("MAIN - ****** distance_home: {}, Type: {}".format(distance_home, type(distance_home)))
+				logger.debug("MAIN - ****** distance_home_previous: {}, Type: {}".format(distance_home_previous, type(distance_home_previous)))
 				distance_home_delta = distance_home - distance_home_previous
 				logger.debug("MAIN - distance_home_delta: {}".format(distance_home_delta))
 			

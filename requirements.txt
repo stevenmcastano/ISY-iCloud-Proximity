@@ -2,3 +2,4 @@ peewee>=2.4.4
 pyicloud>=0.9.1
 geopy>=1.11.0
 xmltodict>=0.10.2
+click>=6.6
