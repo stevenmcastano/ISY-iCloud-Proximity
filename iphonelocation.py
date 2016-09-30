@@ -232,6 +232,9 @@ try:
 		general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
 		general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
 		general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
+		general_conf['isold_reject'] = parser.get('general', 'isold_reject')
+		general_conf['isold_retries'] = int(parser.get('general', 'isold_retries'))
+		general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
@@ -543,16 +546,58 @@ def compute_sleep_time(distance_home, distance_home_delta):
 def device_data_read():
 	try:
 		logger.debug('DEVICE_DATA_READ - Running...')
-		iPhone_Location = api.devices[device_conf['iCloudGUID']].location()
-		if iPhone_Location == None:
-			logger.warn('DEVICE_DATA_READ - API data read was "None", returning an error.')
-			return 1, 0
-		elif 'latitude' in iPhone_Location and 'longitude' in iPhone_Location:
-			logger.debug('DEVICE_DATA_READ - iPhone Location (all): {}'.format(iPhone_Location))
-			return 0, iPhone_Location
-		else:
-			logger.warn('DEVICE_DATA_READ - API data read was not read properly returning an error.')
-			return 1, 0
+		### Set the attempt number to read data:
+		attempt = 1
+		
+		
+		while True:
+			### Read the iCloud API data:
+			iPhone_Location = api.devices[device_conf['iCloudGUID']].location()
+		
+			### If the data returned is "None" log it and return an error:
+			if iPhone_Location == None:
+				logger.warn('DEVICE_DATA_READ - API data read was "None", returning an error.')
+				return 1, 0
+		
+			### If the data has a latitude and longitude in it continue processing:
+			elif 'latitude' in iPhone_Location and 'longitude' in iPhone_Location:
+				### Log the data that was read:
+				logger.debug('DEVICE_DATA_READ - iPhone Location (all): {}'.format(iPhone_Location))
+
+				### If the app is configured to retry if old data is returned and the "isOld" value is true and we haven't tried too many times, log
+				### the warning, increment the attempt number, sleep for the configure seconds and stay in the loop:
+				if general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and attempt <= general_conf['isold_retries']:
+					logger.warn('DEVICE_DATA_READ - Location data from API "isOLD". This is attempt #{}, sleeping for {} seconds and retrying.'.format(
+						attempt, general_conf['isold_sleep']))
+					attempt = attempt + 1
+					time.sleep(general_conf['isold_sleep'])
+				### If the app is confgured to reject old data, and the data is old, but we've tried too many times, log the warning and return:
+				elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and attempt > general_conf['isold_retries']:
+					logger.warn('DEVICE_DATA_READ - Location data from API "isOLD" but we have hit the max retry limit. Returning old data.')
+					return 0, iPhone_Location
+				### If the app is confgured to reject old data, but the data isn't old, return it.
+				elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == False:
+					logger.debug('DEVICE_DATA_READ - Location data from API is current, returning.')
+					return 0, iPhone_Location
+				### Is the app is configured to accept old data, and it's old, return it anyway.
+				elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == True:
+					logger.warn('DEVICE_DATA_READ - Location data from API "isOLD" but the app is configure to ignore. Returning data.')
+					return 0, iPhone_Location
+				### If the app is configure to accept old data, but this data wasn't old, then just return the good data:
+				elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == False:
+					logger.debug('DEVICE_DATA_READ - Location data from API is current, returning.')
+					return 0, iPhone_Location
+				### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
+				else:
+					logger.warn('DEVICE_DATA_READ - Location data did not match any validation conditions, returning anyway.')
+					return 0, iPhone_Location
+		
+			### If the data return was something other than valid data or "None" warn us and return.
+			else:
+				logger.warn('DEVICE_DATA_READ - API data read was not read properly returning an error.')
+				return 1, 0
+	
+	### If something went totally nutso in the data read function, show the traceback info and return an error:
 	except:
 		logger.debug('DEVICE_DATA_READ - Failed!', exc_info=True)
 		return 1, 0
