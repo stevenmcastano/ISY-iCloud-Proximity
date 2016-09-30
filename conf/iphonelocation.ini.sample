@@ -86,3 +86,10 @@ isy_distance_precision = 0
 # above precision setting left set at 0, will report it's distance to the ISY as 2312. This
 # basically means your distance is 2312 100ths of a mile.
 isy_distance_multiplier = 0
+# This setting tells the app to reject data if the iCloud API reports that it's "old"
+isold_reject=True
+# This setting tells the app how many times to try again to read data to see if it's no longer "old"
+isold_retries=6
+# The setting tells the app when retrying (if enabled) to get data that is not "old", how long it
+# shoud sleep in seconds between attempts
+isold_sleep=30
