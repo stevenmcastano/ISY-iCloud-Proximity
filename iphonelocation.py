@@ -235,7 +235,10 @@ try:
 		general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
 		general_conf['isold_reject'] = parser.get('general', 'isold_reject')
 		general_conf['isold_retries'] = int(parser.get('general', 'isold_retries'))
-		general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))
+		general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))	
+		general_conf['gpsfromcell_reject'] = parser.get('general', 'gpsfromcell_reject')
+		general_conf['gpsfromcell_retries'] = int(parser.get('general', 'gpsfromcell_retries'))
+		general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
@@ -559,11 +562,19 @@ def compute_sleep_time(distance_home, distance_home_delta):
 def device_data_read():
 	try:
 		logger.debug('DEVICE_DATA_READ - Running...')
-		### Set the attempt number to read data:
-		attempt = 1
+		### Set the attempt number to read data if it's old:
+		isold_attempt = 1
+		### Set the attempt number to read data if it's old:
+		isfromcell_attempt = 1
+
 		
 		
 		while True:
+			### Set the isOld pass:
+			isold_pass = False
+			### Set the isfromcell_pass:
+			isfromcell_pass = False
+			
 			### Read the iCloud API data:
 			iPhone_Location = api.devices[device_conf['iCloudGUID']].location()
 		
@@ -579,33 +590,75 @@ def device_data_read():
 
 				### If the app is configured to retry if old data is returned and the "isOld" value is true and we haven't tried too many times, log
 				### the warning, increment the attempt number, sleep for the configure seconds and stay in the loop:
-				if general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and attempt <= general_conf['isold_retries']:
-					logger.warn('DEVICE_DATA_READ - Location data from API "isOLD". This is attempt #{}, sleeping for {} seconds and retrying.'.format(
-						attempt, general_conf['isold_sleep']))
-					attempt = attempt + 1
-					time.sleep(general_conf['isold_sleep'])
-				### If the app is confgured to reject old data, and the data is old, but we've tried too many times, log the warning and return:
-				elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and attempt > general_conf['isold_retries']:
-					logger.warn('DEVICE_DATA_READ - Location data from API "isOLD" but we have hit the max retry limit. Returning old data.')
+				try:
+					if general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and isold_attempt <= general_conf['isold_retries']:
+						logger.warn('DEVICE_DATA_READ - Location data from API "isOLD". This is attempt #{}, sleeping for {} seconds and retrying.'.format(
+							isold_attempt, general_conf['isold_sleep']))
+						isold_attempt = isold_attempt + 1
+						time.sleep(general_conf['isold_sleep'])
+					### If the app is confgured to reject old data, and the data is old, but we've tried too many times, log the warning and return:
+					elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and isold_attempt > general_conf['isold_retries']:
+						logger.warn('DEVICE_DATA_READ - Location data from API "isOLD" but we have hit the max retry limit. Continuing.')
+						isold_pass = True
+					### If the app is confgured to reject old data, but the data isn't old, return it.
+					elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == False:
+						logger.debug('DEVICE_DATA_READ - Location data from API is current, continuing.')
+						isold_pass = True
+					### Is the app is configured to accept old data, and it's old, return it anyway.
+					elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == True:
+						logger.debug('DEVICE_DATA_READ - Location data from API "isOLD" but the app is configure to ignore. Continuing.')
+						isold_pass = True
+					### If the app is configure to accept old data, but this data wasn't old, then just return the good data:
+					elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == False:
+						logger.debug('DEVICE_DATA_READ - Location data from API is current, continuing.')
+						isold_pass = True
+					### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
+					else:
+						logger.warn('DEVICE_DATA_READ - Location data did not match any "isOld" validation conditions, continuing anyway.')
+						isold_pass = True
+				except:
+					logger.error('DEVICE_DATA_READ - The was as problem with the "isOld" check, it failed!', exc_info=True)
+
+				### If the app is configured to ignore "Cell" based GPS coordinates, sleep for the specified amount of time and max
+				### number of retries before returning data anyway
+				try:
+					if general_conf['gpsfromcell_reject'] == 'True' and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt <= general_conf['gpsfromcell_retries']:
+						logger.warn('DEVICE_DATA_READ - Location data from API was from "Cell", ignoring. This is attempt #{}, sleeping for {} seconds and retrying.'.format(
+							isfromcell_attempt, general_conf['gpsfromcell_sleep']))
+						isfromcell_attempt = isfromcell_attempt + 1
+						time.sleep(general_conf['gpsfromcell_sleep'])
+					### If the app is confgured to reject cell data, and the data is from cell, but we've tried too many times, log the warning and return:
+					elif general_conf['gpsfromcell_reject'] == 'True' and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt > general_conf['gpsfromcell_retries']:
+						logger.warn('DEVICE_DATA_READ - Location data from API is from "Cell", but we have hit the max retry limit. Continuing.')
+						isfromcell_pass = True
+					### If the app is confgured to reject cell data, but the data isn't old, return it.
+					elif general_conf['gpsfromcell_reject'] == 'True' and iPhone_Location['positionType'] != 'Cell':
+						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
+						isfromcell_pass = True
+					### Is the app is configured to accept cell data, and it's from a cell source, return it anyway.
+					elif general_conf['gpsfromcell_reject'] == 'False' and iPhone_Location['positionType'] == 'Cell':
+						logger.debug('DEVICE_DATA_READ - Location data from API is from "Cell" but the app is configure to ignore. Continuing.')
+						isfromcell_pass = True
+					### If the app is configure to accept "Cell" based data, but this data wasn't wasn't from "Cell", then just return the good data:
+					elif general_conf['gpsfromcell_reject'] == 'False' and iPhone_Location['positionType'] != 'Cell':
+						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
+						isfromcell_pass = True
+					### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
+					else:
+						logger.warn('DEVICE_DATA_READ - Location data did not match any "from Cell" validation conditions, continuing anyway.')
+						isfromcell_pass = True
+				except:
+					logger.error('DEVICE_DATA_READ - The was as problem with the "isOld" check, it failed!', exc_info=True)
+				
+				logger.debug('DEVICE_DATA_READ - The data passed "isOld and "from Cell" validation checks, or hit the max retries, returning data to main function.')	
+				### If the data passes the "isOld" and "reject GPS conditions, return it:
+				if isold_pass == True and isfromcell_pass == True:
 					return 0, iPhone_Location
-				### If the app is confgured to reject old data, but the data isn't old, return it.
-				elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == False:
-					logger.debug('DEVICE_DATA_READ - Location data from API is current, returning.')
-					return 0, iPhone_Location
-				### Is the app is configured to accept old data, and it's old, return it anyway.
-				elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == True:
-					logger.warn('DEVICE_DATA_READ - Location data from API "isOLD" but the app is configure to ignore. Returning data.')
-					return 0, iPhone_Location
-				### If the app is configure to accept old data, but this data wasn't old, then just return the good data:
-				elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == False:
-					logger.debug('DEVICE_DATA_READ - Location data from API is current, returning.')
-					return 0, iPhone_Location
-				### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
 				else:
-					logger.warn('DEVICE_DATA_READ - Location data did not match any validation conditions, returning anyway.')
-					return 0, iPhone_Location
+					logger.debug('DEVICE_DATA_READ - A data validation check was not passed, retrying.')
+					pass
 		
-			### If the data return was something other than valid data or "None" warn us and return.
+			### If the data did not properly pass validation conditions warn us and return anyway.
 			else:
 				logger.warn('DEVICE_DATA_READ - API data read was not read properly returning an error.')
 				return 1, 0
@@ -734,12 +787,6 @@ while True:
 				logger.debug("MAIN - App Timestamp: {}".format(api_last_used_time))
 				data_age = (api_last_used_time - iPhone_Location_Time).total_seconds()
 				logger.debug("MAIN - Data Age: {} seconds".format(data_age))
-						
-				### Check if the GPS data is current and the current distance home and see if it's different from the previous value:
-				if not iPhone_Location['isOld']:
-					logger.debug("MAIN - iPhone location data is current.")
-				else:
-					logger.debug("MAIN - iPhone location data is old.")
 				
 				if distance_home_previous == distance_home_precision:
 					logger.debug("MAIN - The distance from home hasn't changed, moving on.")

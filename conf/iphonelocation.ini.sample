@@ -93,3 +93,10 @@ isold_retries=6
 # The setting tells the app when retrying (if enabled) to get data that is not "old", how long it
 # shoud sleep in seconds between attempts
 isold_sleep=30
+# This setting tells the app to reject data if the iCloud API reports that it's from a "Cell" based lookup instead of WiFi, GPS or GPS-Course
+gpsfromcell_reject=False
+# This setting tells the app how many times to try again to read data to see if it's no longer "old"
+gpsfromcell_retries=6
+# The setting tells the app when retrying (if enabled) to get data that is not "old", how long it
+# shoud sleep in seconds between attempts
+gpsfromcell_sleep=30
