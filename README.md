@@ -28,7 +28,7 @@ Everything on my original plan/roadmap has been covered for the most part. There
 # Dependancies / Installation
 You will need the following installed:<br>
 1) Python 2.7<br>
-2) Pythong Pip<br>
+2) Python pip<br>
 3) MySQL or equivilant (I use MariaDB)<br>
 
 # Usage
