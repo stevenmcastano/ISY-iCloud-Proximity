@@ -22,20 +22,20 @@ Sleep time variation: The script will check your iCloud GPS location once per mi
 Currently, the script has the ability to check variables on the ISY that you can use to keep track of whether or not a device is present on your WiFi network or can be seen by a Bluetooth radio. In this case, if your phone is on your home WiFi, or is within range of a Bluetooth beacon in your home, the script knows you (your iOS device) is home and it doesn't check your GPS signal at all, instead the loop sleeps for 5 minutes before checking to see if your phone is still on WiFi and/or in range of the Bluetooth beacon. If it is NOT, the script begins to check it's GPS position again exactly as decribed above.
 
 <h4>Roadmap:</h4>
-<br>Everything on my original plan/roadmap has been covered for the most part. There isn't much left:
+Everything on my original plan/roadmap has been covered for the most part. There isn't much left:
 1) Investigate checking battery level and suspend checking more than once per hour if it falls below a configurable threshold.
 
 # Dependancies / Installation
 You will need the following installed:<br>
 1) Python 2.7<br>
 2) Pythong Pip<br>
-3) MySQL or equivilant (I use MariaDB)<BR>
+3) MySQL or equivilant (I use MariaDB)<br>
 
 # Usage
 1) Install the dependancies listed above<br>
 2) Clone this repository to your local computer/server<br>
 3) Install MySQL and create a database to store your location data<br>
-4) Run `pip install -r requrements.txt' to install all needed python modules<br>
+4) Run `pip install -r requrements.txt` to install all needed python modules<br>
 5) Copy the iphonelocation.ini.sample file to iphonelocation.ini and enter the relevant data (You probably won't know the GUID for your Apple Device yet, but that's ok, you can leave that blank for now.<br>
 6) Complete the `[database]` section of the config file with the hostname, port, database name, username and password of the MySQL database you've created<br>
 7) Complete the `[ISY]` section of the configuration file. This is the username, password and connection settings to your Universal Device ISY controller.<br>
