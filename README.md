@@ -40,7 +40,7 @@ You will need the following installed:<br>
 6) Complete the `[database]` section of the config file with the hostname, port, database name, username and password of the MySQL database you've created<br>
 7) Complete the `[ISY]` section of the configuration file. This is the username, password and connection settings to your Universal Device ISY controller.<br>
 8) Determine what variable number your ISY with store your "distance to home" data in (This must be a variable of type "state".)<br>
-9) Change to the 'tools; directory and run `python ./listdevices.py` and it will connect to the iCloud API using the credentials from the iphonelocation.ini file and list all the devices associated with your iCloud ID. Make sure the iCloud API settings in the iphonelocation.ini file are set, the listdevices.py script reads your login and password from there.
+9) Change to the 'tools; directory and run `python ./listdevices.py` and it will connect to the iCloud API using the credentials from the iphonelocation.ini file and list all the devices associated with your iCloud ID. Make sure the iCloud API settings in the iphonelocation.ini file are set, the listdevices.py script reads your login and password from there.<br>
 10) Copy and paste the long identifier number (GUID) from the device you'd like to track and past it into the iphonelocation.ini file as your `iCloudGUID`<br>
 11) Go to [Google Maps](http://maps.google.com), search for your home address, click on the map right over your house and copy down the lattitude and longitude, you'll need to enter those in the iphonelocation.ini file in the `location_home_lat` and `location_home_long` sections<br>
 
