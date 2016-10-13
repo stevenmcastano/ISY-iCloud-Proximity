@@ -2,3 +2,5 @@ logs
 logs/*
 
 conf/*.ini
+
+sync.sh
