@@ -100,3 +100,9 @@ gpsfromcell_retries=6
 # The setting tells the app when retrying (if enabled) to get data that is not "old", how long it
 # shoud sleep in seconds between attempts
 gpsfromcell_sleep=30
+# This setting controls weather or not you should use the battery level threshold check:
+battery_check = True
+# This setting controls what the battery threshold level should be:
+battery_threshold = 15
+# This setting controls how long the script should sleep in seconds if the device falls below the battery threshold:
+battery_sleep =  3600

@@ -18,6 +18,7 @@ except:
 
 ### Database library
 import peewee as pw
+from playhouse.migrate import *
 
 ### iCloud imports:
 try:
@@ -238,7 +239,10 @@ try:
 		general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))	
 		general_conf['gpsfromcell_reject'] = parser.get('general', 'gpsfromcell_reject')
 		general_conf['gpsfromcell_retries'] = int(parser.get('general', 'gpsfromcell_retries'))
-		general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))
+		general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))	
+		general_conf['battery_check'] = parser.get('general', 'battery_check')
+		general_conf['battery_threshold'] = int(parser.get('general', 'battery_threshold'))
+		general_conf['battery_sleep'] = int(parser.get('general', 'battery_sleep'))
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
@@ -309,6 +313,7 @@ class location_log(MySQLModel):
 	iCloud_locationFinished = pw.BooleanField()
 	iCloud_isOld = pw.BooleanField()
 	iCloud_isInaccurate = pw.BooleanField()
+	iCloud_batterylevel = pw.DoubleField()
 	App_ISYUpdated = pw.BooleanField()
 	App_ISYUpdateValue = pw.DoubleField()
 	App_SleepTime = pw.DoubleField()
@@ -318,6 +323,54 @@ class location_log(MySQLModel):
 db.connect()
 db.create_tables([location_log], True)
 db.close()
+
+try:
+	logger.debug('MAIN - Looking at DB schema')
+	db.connect()
+
+	### Check to see how many record are in this DB:
+	num_of_records = location_log.select().count()
+	logger.info('MAIN - There are {} records in the current DB'.format(num_of_records))
+	
+	if num_of_records == 0:
+		logger.info('MAIN - Your DB is empty, dropping and recreating the tables to make sure they are up to date.')
+		logger.debug('MAIN - Dropping location_log.')
+		db.drop_tables([location_log], True)
+		logger.debug('MAIN - Creating location_log.')
+		db.create_tables([location_log], True)	
+	else:
+		try:
+			### Try to get a single location log record:
+			location_log_data = location_log.get()
+			### Print a list of the field names:
+			logger.debug('MAIN - The current location_log table has the following fields: {}'.format(location_log_data._data))
+			location_log_data = dict(location_log_data._data)
+			logger.debug('MAIN - The current location_log dict fields: {}'.format(location_log_data))
+			### Print the dict keys:
+			logger.debug('MAIN - The current location_log table has the following keys: {}'.format(location_log_data.keys()))
+			### Check for battery_level in the DB:
+			if 'iCloud_batterylevel' in location_log_data.keys():
+				logger.debug('MAIN - iCloud_batterylevel is present in your database')
+			else:
+				logger.debug('MAIN - iCloud_batterylevel is NOT preset, adding it to your database')
+		except:
+			logger.warn('MAIN - Getting a record failed, this probably means you do not have the iCloud_batterylevel field in your DB, adding it.', exc_info=True)
+			### If getting the record fails, add the battery level field to the DB:
+			try:
+				logger.debug('MAIN - Definging the migrator')
+				migrator = MySQLMigrator(db)
+				logger.debug('MAIN - Adding the columnn.')
+				#iCloud_batterylevel = pw.DoubleField()
+				migrate(
+					migrator.add_column('location_log', 'iCloud_batterylevel', pw.DoubleField(default=-1))
+				)
+			except:
+				logger.warn('MAIN - Failed to add the iCloud_batterylevel column', exc_info=True)
+		
+	db.close()
+except:
+	logger.error('MAIN - Looking at DB schema failed!', exc_info=True)
+	db.close()
 #
 #
 #
@@ -452,9 +505,9 @@ def api_login():
 ### Function to print the table header of data to the screen:
 def print_table_header():
 	### Print out an initial table heading:
-	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
-	logger.info("| Timestamp           |DataAge| DistHome (miles) | ISY (*Update) | Latitude        | Longitude       | HorizAccuracy |PositionType|LocType|LocFin | isOld |isInacc|")
-	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+-------+-------+-------+-------|")
+	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
+	logger.info("| Timestamp           |DataAge| DistHome (miles) | ISY (*Update) | Latitude        | Longitude       | HorizAccuracy |PositionType| Batt |LocType|LocFin | isOld |isInacc|")
+	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
 ### Function to do radio checks for WiFi and Bluetooth:
 def individual_radio_check(var, expected_value):
 	try:
@@ -592,7 +645,7 @@ def device_data_read():
 				### the warning, increment the attempt number, sleep for the configure seconds and stay in the loop:
 				try:
 					if general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and isold_attempt <= general_conf['isold_retries']:
-						logger.warn('DEVICE_DATA_READ - Location data from API "isOLD". This is attempt #{}, sleeping for {} seconds and retrying.'.format(
+						logger.debug('DEVICE_DATA_READ - Location data from API "isOLD". This is attempt #{}, sleeping for {} seconds and retrying.'.format(
 							isold_attempt, general_conf['isold_sleep']))
 						isold_attempt = isold_attempt + 1
 						time.sleep(general_conf['isold_sleep'])
@@ -694,6 +747,26 @@ def twofa_auth():
 	except:
 		logger.debug('2FA_AUTH - Failed!', exc_info=True)
 		return 1
+### A Function to check battery level:
+def device_battery_level():
+	try:
+		logger.debug('DEVICE_BATTERY_LEVEL - Getting the battery level of the iOS device.')
+		
+		### In one shot grab the devices battery level:
+		Device_Battery_Level = int((api.devices[device_conf['iCloudGUID']].status()['batteryLevel'] * 100))
+		
+		### Validate the data:
+		if Device_Battery_Level >= 1 and Device_Battery_Level <= 100:
+			logger.debug('DEVICE_BATTERY_LEVEL - Got a valid battery level of: {}%, returning.'.format(Device_Battery_Level))
+			return 0, Device_Battery_Level
+			### The line below was added to be uncommented for testing battery threshold
+			#return 0, 15
+		else:
+			logger.warn('DEVICE_BATTERY_LEVEL - Battery level did not pass validation checks, returning an error.')
+			return 1, 0
+	except:
+		logger.error('DEVICE_BATTERY_LEVEL - Getting the battery level of the iOS device failed!', exc_info=True)
+		return 1, 0
 ############################################################################################################
 ## THREAD DEFINITIONS                                                                                      #
 ############################################################################################################
@@ -782,6 +855,22 @@ while True:
 					iPhone_Location['latitude'], iPhone_Location['longitude'], iPhone_Location['isInaccurate'],
 					iPhone_Location['positionType'], distance_home))
 			
+				### Get the battery level if checking is enabled:
+				if general_conf['battery_check'] == 'True':
+					### Grab the battery level of the device:
+					exit_code, battery_level = device_battery_level()
+					if exit_code == 0:
+						logger.debug('MAIN - A valid battery level was found. It is: {}%'.format(battery_level))
+						battery_level_display = '{}%'.format(battery_level)
+					else:
+						logger.debug('MAIN - There was an error reading the battery level, ignoring this and moving on.')
+						battery_level = -1
+						battery_level_display = 'N/A'
+				else:
+					logger.debug('MAIN - Battery checking is disabled, setting level to -1')
+					battery_level = -1
+					battery_level_display = 'N/A'
+			
 				### Show time deltas:
 				logger.debug("MAIN - API Timestamp: {}".format(iPhone_Location_Time))
 				logger.debug("MAIN - App Timestamp: {}".format(api_last_used_time))
@@ -813,7 +902,7 @@ while True:
 					isy_value_string = '{}'.format(distance_home_precision)
 				
 				### Print a line of the table with all needed info regarding the location process
-				logger.info("| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
+				logger.info("| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
 							str(iPhone_Location_Time).ljust(19),
 							str(int(data_age)).ljust(5),
 							str(distance_home).ljust(16),
@@ -822,6 +911,7 @@ while True:
 							str(iPhone_Location['longitude']).ljust(15),
 							str(iPhone_Location['horizontalAccuracy']).ljust(13),
 							str(iPhone_Location['positionType']).ljust(10),
+							str(battery_level_display).ljust(4),
 							str(iPhone_Location['locationType']).ljust(5),
 							str(iPhone_Location['locationFinished']).ljust(5),
 							str(iPhone_Location['isOld']).ljust(5),
@@ -846,10 +936,30 @@ while True:
 				### Sleep between checking cycles
 				exit_code, sleep_time = compute_sleep_time(distance_home, distance_home_delta)
 				if exit_code == 0:
-					logger.debug("MAIN - Based on a distance_home of {}, we're sleeping for {} seconds.".format(distance_home, sleep_time))
+					logger.debug("MAIN - Based on a distance_home of {}, the script wants to sleep for {} seconds.".format(distance_home, sleep_time))
+					### Check to see if battery level reading is valid and enabled:
+					if general_conf['battery_check'] == 'True' and battery_level != -1:
+						logger.debug('MAIN - Battery checking is enabled.')
+						if battery_level <= general_conf['battery_threshold']:
+							logger.debug('MAIN - Battery level is below the set threshold')
+							if sleep_time < general_conf['battery_sleep']:
+								logger.debug('MAIN - The computed sleep time is less than the low battery sleep time. Using the low battery sleep time of {} seconds.'.format(general_conf['battery_sleep']))
+								sleep_time = general_conf['battery_sleep']
+							else:
+								logger.debug('MAIN - The computed sleep time is longer than the low battery sleep time. Using the computed sleep time.')
+						else:
+							logger.debug('MAIN - Battery level is ok, using the computed sleep time.')
+							pass
+					else:
+						logger.debug('MAIN - Battery checking is disabled or there was an error, using computed sleep time.')
+						pass
 				else:
 					logger.debug("MAIN - Computing the sleep time returned an error. Setting it to 300 seconds.")
 					sleep_time = 300
+					
+					
+				
+
 				
 				try:
 				### Create dict to store data in database:
@@ -866,6 +976,7 @@ while True:
 						'iCloud_locationFinished': iPhone_Location['locationFinished'],
 						'iCloud_isOld': iPhone_Location['isOld'],
 						'iCloud_isInaccurate': iPhone_Location['isInaccurate'],
+						'iCloud_batterylevel': battery_level,
 						'App_ISYUpdated': isy_updated,
 						'App_ISYUpdateValue': distance_home_precision,
 						'App_SleepTime': int(sleep_time),
