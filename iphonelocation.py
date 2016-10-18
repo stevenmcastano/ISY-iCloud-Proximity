@@ -198,7 +198,7 @@ try:
 		isy_conf['password'] = parser.get('ISY', 'password')
 		isy_conf['hostname'] = parser.get('ISY', 'hostname')
 		isy_conf['port'] = int(parser.get('ISY', 'port'))
-		isy_conf['SSL'] = parser.get('ISY', 'SSL')
+		isy_conf['SSL'] = parser.getboolean('ISY', 'SSL')
 		logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [ISY] section. You may need to start wiith a new .ini \
@@ -234,13 +234,13 @@ try:
 		general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
 		general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
 		general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
-		general_conf['isold_reject'] = parser.get('general', 'isold_reject')
+		general_conf['isold_reject'] = parser.getboolean('general', 'isold_reject')
 		general_conf['isold_retries'] = int(parser.get('general', 'isold_retries'))
 		general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))	
-		general_conf['gpsfromcell_reject'] = parser.get('general', 'gpsfromcell_reject')
+		general_conf['gpsfromcell_reject'] = parser.getboolean('general', 'gpsfromcell_reject')
 		general_conf['gpsfromcell_retries'] = int(parser.get('general', 'gpsfromcell_retries'))
 		general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))	
-		general_conf['battery_check'] = parser.get('general', 'battery_check')
+		general_conf['battery_check'] = parser.getboolean('general', 'battery_check')
 		general_conf['battery_threshold'] = int(parser.get('general', 'battery_threshold'))
 		general_conf['battery_sleep'] = int(parser.get('general', 'battery_sleep'))
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
@@ -255,8 +255,8 @@ try:
 		device_conf = {}
 		device_conf['name'] = parser.get('device', 'name')
 		device_conf['shortname'] = parser.get('device', 'shortname')
-		device_conf['WiFiCheck'] = parser.get('device', 'WiFiCheck')
-		device_conf['BTCheck'] = parser.get('device', 'BTCheck')
+		device_conf['WiFiCheck'] = parser.getboolean('device', 'WiFiCheck')
+		device_conf['BTCheck'] = parser.getboolean('device', 'BTCheck')
 		device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
 		device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
 		device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
@@ -401,9 +401,9 @@ def isy_variable(action, var_type, var_number, value):
 		
 		logger.debug("ISY_VARIABLE - isy_conf['SSL']: {}".format(isy_conf['SSL']))
 		
-		if isy_conf['SSL'] == 'True':
+		if isy_conf['SSL'] == True:
 			url_prefix = 'https'
-		elif isy_conf['SSL'] == 'False':
+		elif isy_conf['SSL'] == False:
 			url_prefix = 'http'
 		else:
 			logger.warn('ISY_VARIABLE - Could not determine ISY SSL or NOT, assuming HTTP.')
@@ -533,7 +533,7 @@ def radio_check():
 		logger.debug('RADIO_CHECK - Running...')
 		
 		### Wifi checking:
-		if device_conf['WiFiCheck'] == 'True':
+		if device_conf['WiFiCheck'] == True:
 			### Read the value of the wifi present variable:
 			logger.debug('RADIO_CHECK - Checking to see if the iPhone is present on WiFi...')
 			exit_code, iPhone_WiFi_Here = individual_radio_check(device_conf['ISYWifiVAR'], device_conf['ISYWifiVAR_Expected'])
@@ -547,7 +547,7 @@ def radio_check():
 			logger.debug('RADIO_CHECK - Script is not set to check for WiFi proximity, continuing...')
 
 		### Bluetooth checking:
-		if device_conf['BTCheck'] == 'True':
+		if device_conf['BTCheck'] == True:
 			### Read the value of the wifi present variable:
 			logger.debug('RADIO_CHECK - Checking to see if the iPhone is present on Bluetooth...')
 			exit_code, iPhone_BT_Here = individual_radio_check(device_conf['ISYBtVAR'], device_conf['ISYBtVAR_Expected'])
@@ -644,25 +644,25 @@ def device_data_read():
 				### If the app is configured to retry if old data is returned and the "isOld" value is true and we haven't tried too many times, log
 				### the warning, increment the attempt number, sleep for the configure seconds and stay in the loop:
 				try:
-					if general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and isold_attempt <= general_conf['isold_retries']:
+					if general_conf['isold_reject'] == True and iPhone_Location['isOld'] == True and isold_attempt <= general_conf['isold_retries']:
 						logger.debug('DEVICE_DATA_READ - Location data from API "isOLD". This is attempt #{}, sleeping for {} seconds and retrying.'.format(
 							isold_attempt, general_conf['isold_sleep']))
 						isold_attempt = isold_attempt + 1
 						time.sleep(general_conf['isold_sleep'])
 					### If the app is confgured to reject old data, and the data is old, but we've tried too many times, log the warning and return:
-					elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == True and isold_attempt > general_conf['isold_retries']:
+					elif general_conf['isold_reject'] == True and iPhone_Location['isOld'] == True and isold_attempt > general_conf['isold_retries']:
 						logger.warn('DEVICE_DATA_READ - Location data from API "isOLD" but we have hit the max retry limit. Continuing.')
 						isold_pass = True
 					### If the app is confgured to reject old data, but the data isn't old, return it.
-					elif general_conf['isold_reject'] == 'True' and iPhone_Location['isOld'] == False:
+					elif general_conf['isold_reject'] == True and iPhone_Location['isOld'] == False:
 						logger.debug('DEVICE_DATA_READ - Location data from API is current, continuing.')
 						isold_pass = True
 					### Is the app is configured to accept old data, and it's old, return it anyway.
-					elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == True:
+					elif general_conf['isold_reject'] == False and iPhone_Location['isOld'] == True:
 						logger.debug('DEVICE_DATA_READ - Location data from API "isOLD" but the app is configure to ignore. Continuing.')
 						isold_pass = True
 					### If the app is configure to accept old data, but this data wasn't old, then just return the good data:
-					elif general_conf['isold_reject'] == 'False' and iPhone_Location['isOld'] == False:
+					elif general_conf['isold_reject'] == False and iPhone_Location['isOld'] == False:
 						logger.debug('DEVICE_DATA_READ - Location data from API is current, continuing.')
 						isold_pass = True
 					### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
@@ -675,25 +675,25 @@ def device_data_read():
 				### If the app is configured to ignore "Cell" based GPS coordinates, sleep for the specified amount of time and max
 				### number of retries before returning data anyway
 				try:
-					if general_conf['gpsfromcell_reject'] == 'True' and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt <= general_conf['gpsfromcell_retries']:
+					if general_conf['gpsfromcell_reject'] == True and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt <= general_conf['gpsfromcell_retries']:
 						logger.warn('DEVICE_DATA_READ - Location data from API was from "Cell", ignoring. This is attempt #{}, sleeping for {} seconds and retrying.'.format(
 							isfromcell_attempt, general_conf['gpsfromcell_sleep']))
 						isfromcell_attempt = isfromcell_attempt + 1
 						time.sleep(general_conf['gpsfromcell_sleep'])
 					### If the app is confgured to reject cell data, and the data is from cell, but we've tried too many times, log the warning and return:
-					elif general_conf['gpsfromcell_reject'] == 'True' and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt > general_conf['gpsfromcell_retries']:
+					elif general_conf['gpsfromcell_reject'] == True and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt > general_conf['gpsfromcell_retries']:
 						logger.warn('DEVICE_DATA_READ - Location data from API is from "Cell", but we have hit the max retry limit. Continuing.')
 						isfromcell_pass = True
 					### If the app is confgured to reject cell data, but the data isn't old, return it.
-					elif general_conf['gpsfromcell_reject'] == 'True' and iPhone_Location['positionType'] != 'Cell':
+					elif general_conf['gpsfromcell_reject'] == True and iPhone_Location['positionType'] != 'Cell':
 						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
 						isfromcell_pass = True
 					### Is the app is configured to accept cell data, and it's from a cell source, return it anyway.
-					elif general_conf['gpsfromcell_reject'] == 'False' and iPhone_Location['positionType'] == 'Cell':
+					elif general_conf['gpsfromcell_reject'] == True and iPhone_Location['positionType'] == 'Cell':
 						logger.debug('DEVICE_DATA_READ - Location data from API is from "Cell" but the app is configure to ignore. Continuing.')
 						isfromcell_pass = True
 					### If the app is configure to accept "Cell" based data, but this data wasn't wasn't from "Cell", then just return the good data:
-					elif general_conf['gpsfromcell_reject'] == 'False' and iPhone_Location['positionType'] != 'Cell':
+					elif general_conf['gpsfromcell_reject'] == False and iPhone_Location['positionType'] != 'Cell':
 						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
 						isfromcell_pass = True
 					### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
@@ -752,8 +752,13 @@ def device_battery_level():
 	try:
 		logger.debug('DEVICE_BATTERY_LEVEL - Getting the battery level of the iOS device.')
 		
+		api_battery_level = api.devices[device_conf['iCloudGUID']].status()['batteryLevel']
+		logger.debug('DEVICE_BATTERY_LEVEL - api_battery_level: {}'.format(api_battery_level))
+		
 		### In one shot grab the devices battery level:
-		Device_Battery_Level = int((api.devices[device_conf['iCloudGUID']].status()['batteryLevel'] * 100))
+		Device_Battery_Level = int(api_battery_level * 100)
+		logger.debug('DEVICE_BATTERY_LEVEL - Device_Battery_Level: {}'.format(Device_Battery_Level))
+		
 		
 		### Validate the data:
 		if Device_Battery_Level >= 1 and Device_Battery_Level <= 100:
@@ -856,7 +861,7 @@ while True:
 					iPhone_Location['positionType'], distance_home))
 			
 				### Get the battery level if checking is enabled:
-				if general_conf['battery_check'] == 'True':
+				if general_conf['battery_check'] == True:
 					### Grab the battery level of the device:
 					exit_code, battery_level = device_battery_level()
 					if exit_code == 0:
@@ -938,7 +943,7 @@ while True:
 				if exit_code == 0:
 					logger.debug("MAIN - Based on a distance_home of {}, the script wants to sleep for {} seconds.".format(distance_home, sleep_time))
 					### Check to see if battery level reading is valid and enabled:
-					if general_conf['battery_check'] == 'True' and battery_level != -1:
+					if general_conf['battery_check'] == True and battery_level != -1:
 						logger.debug('MAIN - Battery checking is enabled.')
 						if battery_level <= general_conf['battery_threshold']:
 							logger.debug('MAIN - Battery level is below the set threshold')
