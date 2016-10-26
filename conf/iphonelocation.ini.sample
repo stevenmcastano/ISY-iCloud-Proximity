@@ -106,3 +106,11 @@ battery_check = True
 battery_threshold = 15
 # This setting controls how long the script should sleep in seconds if the device falls below the battery threshold:
 battery_sleep =  3600
+# This setting controls how many times we're going to check for a valid battery level:
+battery_retries = 3
+# This setting controls how long we sleep between battery read retries
+battery_retries_sleep = 30
+# The follow setting controls if you want the script to force a GPS check even if the script see's the device via radio (wifi or bluetooth) check:
+gps_recheck = yes
+# The follow setting controls how often, in seconds, you want the script to check GPS location even if the device is within local radio range:
+gps_recheck_time = 3600

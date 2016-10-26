@@ -11,14 +11,13 @@ from logging.handlers import SysLogHandler
 import socket, os, time, datetime
 import subprocess
 
-try:
-	import graypy
-except:
-	pass
-
 ### Database library
-import peewee as pw
-from playhouse.migrate import *
+try:
+	import peewee as pw
+	from playhouse.migrate import *
+except:
+	print "Startup: Failed to import the Peewee library. Please make sure it's installed. You can try 'pip install peewee'."
+	exit(1)	
 
 ### iCloud imports:
 try:
@@ -26,7 +25,7 @@ try:
 	import click
 except:
 	print "Startup: Failed to import the pyicloud library. Please make sure it's installed. You can try 'pip install pyicloud'."
-	exit()
+	exit(1)
 
 ### Programatic stuff
 import json, urllib2, xmltodict
@@ -37,7 +36,7 @@ try:
 	from geopy.distance import vincenty
 except:
 	print "Startup: Failed to import the geopy library. Please make sure it's installed. You can try 'pip install geopy'."
-	exit()
+	exit(1)
 	
 ### For reading .ini files
 from ConfigParser import SafeConfigParser
@@ -106,13 +105,6 @@ try:
 			#create a stream handler
 			stream_handler = logging.StreamHandler(sys.stdout)
 			stream_handler.setLevel(logging.INFO)
-			
-			try:
-				#create a syslog handler via rabbitmq
-				syslog_handler = graypy.GELFRabbitHandler('amqp://guest:guest@localhost/%2F', 'logging.gelf')
-				syslog_handler.setLevel(logging.DEBUG)
-			except:
-				pass
 
 			# create a logging format
 			formatter = logging.Formatter('%(asctime)s - %(message)s')
@@ -139,10 +131,6 @@ try:
 			# add the handlers to the logger
 			logger.addHandler(file_handler)
 			logger.addHandler(stream_handler)
-			try:
-				logger.addHandler(syslog_handler)
-			except:
-				pass
 	else:
 		print "Startup: logging.conf exists. Using that."
 		execfile('./conf/logging.conf')
@@ -243,6 +231,12 @@ try:
 		general_conf['battery_check'] = parser.getboolean('general', 'battery_check')
 		general_conf['battery_threshold'] = int(parser.get('general', 'battery_threshold'))
 		general_conf['battery_sleep'] = int(parser.get('general', 'battery_sleep'))
+		
+		general_conf['battery_retries'] = int(parser.get('general', 'battery_retries'))
+		general_conf['battery_retries_sleep'] = int(parser.get('general', 'battery_retries_sleep'))
+		general_conf['gps_recheck'] = parser.getboolean('general', 'gps_recheck')
+		general_conf['gps_recheck_time'] = int(parser.get('general', 'gps_recheck_time'))
+		
 		logger.debug('MAIN - general_conf: {}'.format(general_conf))
 	except:
 		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
@@ -294,6 +288,16 @@ api = None
 global api_last_used_time
 api_last_used_time = None
 #
+global app_version_running
+app_version_running = '0.17.0'
+global app_version_current
+app_version_current = None
+global app_version_check_time
+app_version_check_time = None
+global app_version_is_current
+app_version_is_current = None
+global app_version_update_url
+app_version_update_url = None
 ### Create database with proper logging fields:
 class MySQLModel(pw.Model):
     """A base model that will use our MySQL database"""
@@ -466,7 +470,7 @@ def isy_variable(action, var_type, var_number, value):
 		logger.debug("ISY_VARIABLE - Completed")
 		return 1, -1
 	except:
-		logger.debug("ISY_VARIABLE - Failed!", exc_info=True)
+		logger.warn("ISY_VARIABLE - Failed!", exc_info=True)
 		return 1, -1
 ### Function to automatically restart the application if some unrecoverable error occurs:
 def program_restart():
@@ -504,6 +508,10 @@ def api_login():
 	return
 ### Function to print the table header of data to the screen:
 def print_table_header():
+	### Print the topmost portion of this table header only if there is an update availible.
+	if not app_version_is_current:
+		logger.info("|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|")
+		logger.info("| There is a new version availible, please go to the following URL for release info and to download: {} |".format(app_version_update_url.ljust(67)))
 	### Print out an initial table heading:
 	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
 	logger.info("| Timestamp           |DataAge| DistHome (miles) | ISY (*Update) | Latitude        | Longitude       | HorizAccuracy |PositionType| Batt |LocType|LocFin | isOld |isInacc|")
@@ -676,7 +684,7 @@ def device_data_read():
 				### number of retries before returning data anyway
 				try:
 					if general_conf['gpsfromcell_reject'] == True and iPhone_Location['positionType'] == 'Cell' and isfromcell_attempt <= general_conf['gpsfromcell_retries']:
-						logger.warn('DEVICE_DATA_READ - Location data from API was from "Cell", ignoring. This is attempt #{}, sleeping for {} seconds and retrying.'.format(
+						logger.debug('DEVICE_DATA_READ - Location data from API was from "Cell", ignoring. This is attempt #{}, sleeping for {} seconds and retrying.'.format(
 							isfromcell_attempt, general_conf['gpsfromcell_sleep']))
 						isfromcell_attempt = isfromcell_attempt + 1
 						time.sleep(general_conf['gpsfromcell_sleep'])
@@ -696,7 +704,7 @@ def device_data_read():
 					elif general_conf['gpsfromcell_reject'] == False and iPhone_Location['positionType'] != 'Cell':
 						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
 						isfromcell_pass = True
-					### If the data doesn't match any of our "isOld" validation conditions, warn us and return anyway:
+					### If the data doesn't match any of our "fromCell" validation conditions, warn us and return anyway:
 					else:
 						logger.warn('DEVICE_DATA_READ - Location data did not match any "from Cell" validation conditions, continuing anyway.')
 						isfromcell_pass = True
@@ -751,27 +759,91 @@ def twofa_auth():
 def device_battery_level():
 	try:
 		logger.debug('DEVICE_BATTERY_LEVEL - Getting the battery level of the iOS device.')
+		retry = 0
+		while retry < general_conf['battery_retries']:
+			api_battery_level = api.devices[device_conf['iCloudGUID']].status()['batteryLevel']
+			logger.debug('DEVICE_BATTERY_LEVEL - api_battery_level: {}'.format(api_battery_level))
 		
-		api_battery_level = api.devices[device_conf['iCloudGUID']].status()['batteryLevel']
-		logger.debug('DEVICE_BATTERY_LEVEL - api_battery_level: {}'.format(api_battery_level))
-		
-		### In one shot grab the devices battery level:
-		Device_Battery_Level = int(api_battery_level * 100)
-		logger.debug('DEVICE_BATTERY_LEVEL - Device_Battery_Level: {}'.format(Device_Battery_Level))
-		
-		
-		### Validate the data:
-		if Device_Battery_Level >= 1 and Device_Battery_Level <= 100:
-			logger.debug('DEVICE_BATTERY_LEVEL - Got a valid battery level of: {}%, returning.'.format(Device_Battery_Level))
-			return 0, Device_Battery_Level
-			### The line below was added to be uncommented for testing battery threshold
-			#return 0, 15
-		else:
-			logger.warn('DEVICE_BATTERY_LEVEL - Battery level did not pass validation checks, returning an error.')
-			return 1, 0
+			### In one shot grab the devices battery level:
+			Device_Battery_Level = int(api_battery_level * 100)
+			logger.debug('DEVICE_BATTERY_LEVEL - Device_Battery_Level: {}'.format(Device_Battery_Level))
+			
+			### Validate the data:
+			if Device_Battery_Level >= 1 and Device_Battery_Level <= 100:
+				logger.debug('DEVICE_BATTERY_LEVEL - Got a valid battery level of: {}%, returning.'.format(Device_Battery_Level))
+				return 0, Device_Battery_Level
+				### The line below was added to be uncommented for testing battery threshold
+				#return 0, 15
+			else:
+				logger.debug('DEVICE_BATTERY_LEVEL - Battery level did not pass validation checks, sleeping for {} seconds and trying again.'.format(general_conf['battery_retries_sleep']))
+				time.sleep(general_conf['battery_retries_sleep'])
+				retry = retry + 1
+		logger.warn('DEVICE_BATTERY_LEVEL - Battery level did not pass validation checks and reach the max number of retries. Continuing without a battery level check.')	
+		return 1, 0
 	except:
 		logger.error('DEVICE_BATTERY_LEVEL - Getting the battery level of the iOS device failed!', exc_info=True)
 		return 1, 0
+def interval_calc(current, interval, number):
+	try:
+		#logger.debug('INTERVAL - Running')
+		### create a list to store interval numbers:
+		intervals = [1]
+		interval_count = 1
+		while True:
+			possible_interval = interval_count * interval
+			#logger.debug('INTERVAL - possible_interval: {}'.format(possible_interval))
+			if possible_interval <= number:
+				intervals.append(possible_interval)
+			else:
+				break
+			interval_count = interval_count + 1
+		#logger.debug('INTERVAL - Possible intervals: {}'.format(intervals))
+		if current in intervals:
+			#logger.debug('INTERVAL - {} is an inverval.'.format(current))
+			return True
+		else:
+			return False
+	except:
+		logger.warn('INTERVAL - Failed!', exc_info=True)
+		return True
+def version_check():
+	try:
+		global app_version_running
+		global app_version_current
+		global app_version_check_time
+		global app_version_is_current
+		global app_version_update_url
+		### Hit the updates URL to check the most current app version
+		logger.debug('VERSION_CHECK - Checking current running version of {} to see if it is the most current.'.format(app_version_running))
+		update_pagehandle = urllib2.urlopen('https://updates.casta.no/aXN5aWNsb3VkcHJveGltaXR5Cg==/master/{}/latest.txt'.format(app_version_running))
+		app_version_current = update_pagehandle.read().strip()
+		
+		### Show the user this version in the debug log
+		logger.debug('VERSION_CHECK - The most current version of the application is: {}'.format(app_version_current))
+		
+		### Set the time this version check was done.
+		app_version_check_time = datetime.datetime.now()
+		logger.debug('VERSION_CHECK - The last version check was: {}'.format(app_version_check_time))
+		
+		### Compare the versions to see if they're the seem.
+		if app_version_current == app_version_running:
+			### Tell the user we're ok and we're on the latest version
+			logger.debug('VERSION_CHECK - You are on the latest version.')
+			app_version_is_current = True
+			return
+		else:
+			### Tell the user and update is availible.
+			logger.debug('VERSION_CHECK - Your current running version does not match the version number of the most current version.')
+			app_version_is_current = False
+			
+			### Grab the current update URL from the updates site:
+			update_pagehandle = urllib2.urlopen('https://updates.casta.no/aXN5aWNsb3VkcHJveGltaXR5Cg==/updateurl.txt')
+			app_version_update_url = update_pagehandle.read().strip()
+			logger.debug('VERSION_CHECK - You can view the latest releases and grab the new version from: {}'.format(app_version_update_url))
+			return
+	except:
+		logger.warn('VERSION_CHECK - Failed checking for app updates!', exc_info=True)
+
 ############################################################################################################
 ## THREAD DEFINITIONS                                                                                      #
 ############################################################################################################
@@ -781,6 +853,8 @@ def device_battery_level():
 ## SCRIPT EXECUTION                                                                                         #
 #############################################################################################################
 #
+### Immediately check the version on startup:
+version_check()
 ### Set this interval to show this is the first time the loop is running:
 interval = 1
 ### Print the table header
@@ -797,13 +871,41 @@ loop_number = 0
 distance_home_previous = -1
 ### Init the distance home delta value:
 distance_home_delta = 0
+### Create a timestamp holder for the last loop run:
+last_loop_run = datetime.datetime.now()
+### Record the intended loop sleep time:
+loop_sleep_time = 0
+### Keep track of how many time the loop slept:
+loop_sleep_interval = 0
 ### Run the main script loop:
 while True:
-	### Record what loop number the application is running
-	logger.debug('MAIN - Loop Number: {}'.format(loop_number))
+	time_since_last_version_check = (((datetime.datetime.now() - app_version_check_time)).total_seconds())/3600
+	if time_since_last_version_check >= 6:
+		logger.debug('MAIN - It has been {} hours since your last version check, checking again.'.format(time_since_last_version_check))
+		version_check()
 	
-	### Check to see if the device is in radio range:
-	iPhone_RadioInRange = radio_check()
+	if loop_sleep_interval >= loop_sleep_time:
+		### Record what loop number the application is running
+		logger.debug('MAIN - Loop Number: {}'.format(loop_number))
+	
+		### Calculate the last time the GPS location was read.
+		time_since_last_loop_run = ((datetime.datetime.now() - last_loop_run)).total_seconds()
+		logger.debug('MAIN - The last iOS device GPS check was {} seconds ago.'.format(time_since_last_loop_run))
+	
+	### Run the radio check if it hasn't been too long to check the GPS location.
+	if general_conf['gps_recheck'] and time_since_last_loop_run >= general_conf['gps_recheck_time']:
+		logger.debug('MAIN - It has been too long since the GPS location was read, skipping radio check')
+		iPhone_RadioInRange = False
+		pass
+	elif general_conf['gps_recheck']:
+		if loop_sleep_interval >= loop_sleep_time:
+			logger.debug('MAIN - The GPS location has been checked recently, running the radio check')
+			iPhone_RadioInRange = radio_check()
+	else:
+		if loop_sleep_interval >= loop_sleep_time:
+			logger.debug('MAIN - GPS recheck is not enabled, running the radio check')
+			iPhone_RadioInRange = radio_check()
+
 
 	### Run the rest of the loop only if the iPhone is out of radio range:
 	if not iPhone_RadioInRange:
@@ -961,11 +1063,7 @@ while True:
 				else:
 					logger.debug("MAIN - Computing the sleep time returned an error. Setting it to 300 seconds.")
 					sleep_time = 300
-					
-					
-				
-
-				
+	
 				try:
 				### Create dict to store data in database:
 					db_entry = {
@@ -995,8 +1093,16 @@ while True:
 					logger.warn('MAIN - DB entry failed.', exc_info = True)
 	
 				### Reset the number of failed attempts after one works:
-				failed_attempts = 0	
+				failed_attempts = 0
+				
+				### Set the current time of completing this iOS read loop:
+				last_loop_run = datetime.datetime.now()
+				logger.debug('MAIN - last_loop_run: {}, Type: {}'.format(last_loop_run, type(last_loop_run)))
+				
+				### Sleep
 				time.sleep(int(sleep_time))
+				
+				
 			else:
 				failed_attempts = failed_attempts + 1
 				if failed_attempts < 4:
@@ -1012,12 +1118,29 @@ while True:
 			logger.error('MAIN - Something in the main script failed! Sleeping for 30 seconds and retrying', exc_info=True)
 			time.sleep(30)
 	else:
-		logger.debug("MAIN - iPhone_RadioInRange is {}, sleeping for {} seconds.".format(
-			iPhone_RadioInRange, general_conf['cycle_sleep_withradio']))
-		time.sleep(general_conf['cycle_sleep_withradio'])
+		if loop_sleep_interval >= loop_sleep_time:
+			logger.debug("MAIN - iPhone_RadioInRange is {}, sleeping for {} seconds.".format(
+				iPhone_RadioInRange, general_conf['cycle_sleep_withradio']))
+		else:
+			pass
+		loop_sleep_time = general_conf['cycle_sleep_withradio']
+		time.sleep(1)
+		loop_sleep_interval = loop_sleep_interval + 1
+		should_i_print = interval_calc(loop_sleep_interval, 60, loop_sleep_time)
+		if should_i_print:
+			logger.debug('MAIN - I slept for {} of {} intended seconds.'.format(loop_sleep_interval, loop_sleep_time))
+		#time.sleep(general_conf['cycle_sleep_withradio'])
 
-	### Increase the loop number showing how many times the checking cycle has run:
-	loop_number = loop_number + 1
+		### Increase the loop number showing how many times the checking cycle has run:
+		if loop_sleep_interval >= loop_sleep_time:
+			loop_sleep_interval = 0
+			loop_sleep_time = 0
+			loop_number = loop_number + 1
+		else:
+			pass
+	
+	### Record the last loop run time:
+	#last_loop_run = time.time()
 	###### END OF THE WHILE LOOP ######
 
 logger.info('MAIN - Removing pidfile: /var/run/{}.pid'.format(application_logging_name))
