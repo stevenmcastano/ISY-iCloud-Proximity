@@ -510,12 +510,12 @@ def api_login():
 def print_table_header():
 	### Print the topmost portion of this table header only if there is an update availible.
 	if not app_version_is_current:
-		logger.info("|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|")
-		logger.info("| There is a new version availible, please go to the following URL for release info and to download: {} |".format(app_version_update_url.ljust(67)))
+		logger.info("|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|")
+		logger.info("| There is a new version availible, please go to the following URL for release info and to download: {} |".format(app_version_update_url.ljust(68)))
 	### Print out an initial table heading:
-	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
-	logger.info("| Timestamp           |DataAge| DistHome (miles) | ISY (*Update) | Latitude        | Longitude       | HorizAccuracy |PositionType| Batt |LocType|LocFin | isOld |isInacc|")
-	logger.info("|---------------------+-------+------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
+	logger.info("|---------------------+-------+-------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
+	logger.info("| Timestamp           |DataAge| DistHome (miles)  | ISY (*Update) | Latitude        | Longitude       | HorizAccuracy |PositionType| Batt |LocType|LocFin | isOld |isInacc|")
+	logger.info("|---------------------+-------+-------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
 ### Function to do radio checks for WiFi and Bluetooth:
 def individual_radio_check(var, expected_value):
 	try:
@@ -1012,7 +1012,7 @@ while True:
 				logger.info("| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
 							str(iPhone_Location_Time).ljust(19),
 							str(int(data_age)).ljust(5),
-							str(distance_home).ljust(16),
+							str(distance_home).ljust(17),
 							str(isy_value_string).ljust(13),
 							str(iPhone_Location['latitude']).ljust(15),
 							str(iPhone_Location['longitude']).ljust(15),
