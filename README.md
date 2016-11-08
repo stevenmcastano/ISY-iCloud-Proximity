@@ -40,7 +40,7 @@ You will need the following installed:<br>
 1) Install the dependencies listed above<br>
 2) Clone this repository to your local computer/server<br>
 3) Install MySQL and create a database to store your location data<br>
-4) Run `pip install -r requrements.txt` to install all needed python modules<br>
+4) Run `pip install -r requirements.txt` to install all needed python modules<br>
 5) Copy the `iphonelocation.ini.sample` file to `iphonelocation.ini` and enter the relevant data (You probably won't know the GUID for your Apple device yet, but that's ok, you can leave that blank for now.<br>
 6) Complete the `[database]` section of the config file with the hostname, port, database name, username and password of the MySQL database you've created<br>
 7) Complete the `[ISY]` section of the configuration file. This is the username, password and connection settings to your Universal Devices ISY controller.<br>
