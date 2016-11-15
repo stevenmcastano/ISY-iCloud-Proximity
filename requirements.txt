@@ -3,3 +3,4 @@ pyicloud>=0.9.1
 geopy>=1.11.0
 xmltodict>=0.10.2
 click>=6.6
+pymysql>=0.7.9

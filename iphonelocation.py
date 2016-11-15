@@ -41,6 +41,19 @@ except:
 ### For reading .ini files
 from ConfigParser import SafeConfigParser
 
+### library for operating system detection
+try:
+	import platform
+except:
+	print "Startup: Failed to import the platform libray to determine the operating system, assuming linux."
+
+### Determine OS before proceding farther:
+try:
+	opsys = str(platform.system()).lower()
+	print "Startup: Your current operating system is {}".format(opsys)
+except:
+	print "Startup: Could not determine your operating system, setting to linux."
+	opsys = "linux"
 ############################################################################################################
 ## LOGGING CONFIGURATION                                                                                   #
 ############################################################################################################
@@ -49,11 +62,17 @@ try:
 	application_logging_name = 'iPhoneLocation'
 	pid = os.getpid()
 	print "Startup: PID={}".format(pid)
-	f_out = open('/tmp/{}.pid'.format(application_logging_name), 'w', 0)
+	if opsys == 'linux':
+		f_out = open('/tmp/{}.pid'.format(application_logging_name), 'w', 0)
+	elif opsys == 'windows':
+		f_out = open('c:\{}.pid'.format(application_logging_name), 'w', 0)		
 	f_out.write(str(pid))
 	f_out.flush
 	f_out.close
-	print "Startup: Created pidfile at /tmp/{}.pid".format(application_logging_name)
+	if opsys == 'linux':
+		print "Startup: Created pidfile at /tmp/{}.pid".format(application_logging_name)
+	elif opsys == 'windows':
+		print "Startup: Created pidfile at c:\{}.pid".format(application_logging_name)
 	try:
 		proc = subprocess.Popen(['git', 'describe'], stdout=subprocess.PIPE)
 		service_version = proc.communicate()[0].strip()
@@ -289,7 +308,7 @@ global api_last_used_time
 api_last_used_time = None
 #
 global app_version_running
-app_version_running = '0.17.0'
+app_version_running = '0.17.2'
 global app_version_current
 app_version_current = None
 global app_version_check_time
@@ -509,9 +528,12 @@ def api_login():
 ### Function to print the table header of data to the screen:
 def print_table_header():
 	### Print the topmost portion of this table header only if there is an update availible.
-	if not app_version_is_current:
+	if not app_version_is_current and app_version_current != -1:
 		logger.info("|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|")
 		logger.info("| There is a new version availible, please go to the following URL for release info and to download: {} |".format(app_version_update_url.ljust(68)))
+	elif not app_version_is_current and app_version_current == -1:
+		logger.info("|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|")
+		logger.info("| There was an error checking your application version. For the latest versioning info go to: {} |".format(app_version_update_url.ljust(75)))		
 	### Print out an initial table heading:
 	logger.info("|---------------------+-------+-------------------+---------------+-----------------+-----------------+---------------+------------+------+-------+-------+-------+-------|")
 	logger.info("| Timestamp           |DataAge| DistHome (miles)  | ISY (*Update) | Latitude        | Longitude       | HorizAccuracy |PositionType| Batt |LocType|LocFin | isOld |isInacc|")
@@ -815,8 +837,12 @@ def version_check():
 		global app_version_update_url
 		### Hit the updates URL to check the most current app version
 		logger.debug('VERSION_CHECK - Checking current running version of {} to see if it is the most current.'.format(app_version_running))
-		update_pagehandle = urllib2.urlopen('https://updates.casta.no/aXN5aWNsb3VkcHJveGltaXR5Cg==/master/{}/latest.txt'.format(app_version_running))
-		app_version_current = update_pagehandle.read().strip()
+		try:
+			update_pagehandle = urllib2.urlopen('https://updates.casta.no/aXN5aWNsb3VkcHJveGltaXR5Cg==/master/{}/latest.txt'.format(app_version_running))
+			app_version_current = update_pagehandle.read().strip()
+		except:
+			logger.warn('VERSION_CHECK - Could not connect to or read from the update server. Setting app_version_current to -1')
+			app_version_current = -1
 		
 		### Show the user this version in the debug log
 		logger.debug('VERSION_CHECK - The most current version of the application is: {}'.format(app_version_current))
@@ -837,9 +863,13 @@ def version_check():
 			app_version_is_current = False
 			
 			### Grab the current update URL from the updates site:
-			update_pagehandle = urllib2.urlopen('https://updates.casta.no/aXN5aWNsb3VkcHJveGltaXR5Cg==/updateurl.txt')
-			app_version_update_url = update_pagehandle.read().strip()
-			logger.debug('VERSION_CHECK - You can view the latest releases and grab the new version from: {}'.format(app_version_update_url))
+			try:
+				update_pagehandle = urllib2.urlopen('https://updates.casta.no/aXN5aWNsb3VkcHJveGltaXR5Cg==/updateurl.txt')
+				app_version_update_url = update_pagehandle.read().strip()
+				logger.debug('VERSION_CHECK - You can view the latest releases and grab the new version from: {}'.format(app_version_update_url))
+			except:
+				logger.debug('VERSION_CHECK - Could not read the update url, setting to default.'.format(app_version_update_url))
+				app_version_update_url = 'https://github.com/stevenmcastano/ISY-iCloud-Proximity'
 			return
 	except:
 		logger.warn('VERSION_CHECK - Failed checking for app updates!', exc_info=True)
@@ -1143,6 +1173,10 @@ while True:
 	#last_loop_run = time.time()
 	###### END OF THE WHILE LOOP ######
 
-logger.info('MAIN - Removing pidfile: /var/run/{}.pid'.format(application_logging_name))
-os.remove('/tmp/{}.pid'.format(application_logging_name))
+if opsys == 'linux':
+	logger.info('MAIN - Removing pidfile: /var/run/{}.pid'.format(application_logging_name))
+	os.remove('/tmp/{}.pid'.format(application_logging_name))
+elif opsys == 'windows':
+	logger.info('MAIN - Removing pidfile: c:\{}.pid'.format(application_logging_name))
+	os.remove('c:\{}.pid'.format(application_logging_name))
 logger.info('MAIN - Exiting.')
