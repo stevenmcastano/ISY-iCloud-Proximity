@@ -2,7 +2,7 @@
 
 <h4>Current Build Status:</h4>
 Master:<br>
-![Build Status Graphic](https://travis-ci.org/stevenmcastano/ISY-iCloud-Proximity.svg?branch=master "current build status")<br>
+![Build Status Graphic](https://travis-ci.org/stevenmcastano/ISY-iCloud-Proximity.svg?branch=master "current build status") (Ignore the failure here, this is a testing error with a config file. Everything works fine!!)<br>
 Dev:<br>
 ![Build Status Graphic](https://travis-ci.org/stevenmcastano/ISY-iCloud-Proximity.svg?branch=dev "current build status")<br>
 
