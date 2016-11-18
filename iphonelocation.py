@@ -11,6 +11,13 @@ from logging.handlers import SysLogHandler
 import socket, os, time, datetime
 import subprocess
 
+### requests library
+try:
+	import requests
+except:
+	print "Startup: Failed to import the requests library. Please make sure it's installed. You can try 'pip install requests'."
+	exit(1)	
+
 ### Database library
 try:
 	import peewee as pw
@@ -163,6 +170,16 @@ except:
 ## CLASS DEFINITIONS                                                                                       #
 ############################################################################################################
 #
+############################################################################################################
+## EARLY FUNCTION LOADING                                                                                  #
+############################################################################################################
+### Function to automatically restart the application if some unrecoverable error occurs:
+def program_restart():
+	logger.info('RESTART - Executing restart in 10 seconds...')
+	logger.debug('RESTART - Pause for 10 seconds to settle.')
+	time.sleep(10)
+	python = sys.executable
+	os.execl(python, python, * sys.argv)
 #
 ############################################################################################################
 ## CONFIGURATION VARIABLES                                                                                 #
@@ -170,125 +187,423 @@ except:
 #
 ### Read configuration items:
 try:
+	### Define global variables early to avoid sytax checking errors:
+	global db_conf
+	global isy_conf
+	global openhab_conf
+	global icloudapi_conf
+	global device_conf
+	global general_conf
 	### Check to see if config file exists:
 	if os.path.isfile("./conf/iphonelocation.ini"):
 		logger.debug('MAIN - iphonelocation.ini exists, continuing.')
 	else:
 		logger.error("MAIN - iphonelocation.ini does not exist or can't be read. Exiting!")
 		exit()
-	
-	### Read database configuration:
+
+	### Add rules here to check for sections, versions and options:
 	try:
+		### Initial creation of the config parser object once we know the file is there.
 		parser = SafeConfigParser()
 		parser.read('./conf/iphonelocation.ini')
-		### Grab the database connection settings:
-		global db_conf
-		db_conf = {}
-		db_conf['name'] = parser.get('database', 'database')
-		db_conf['host'] = parser.get('database', 'host')
-		db_conf['port'] = int(parser.get('database', 'port'))
-		db_conf['user'] = parser.get('database', 'user')
-		db_conf['passwd'] = parser.get('database', 'passwd')
-		logger.debug('MAIN - db_conf: {}'.format(db_conf))
 	except:
-		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [database] section. You may need to start wiith a new .ini \
-					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
-					 Exiting!', exc_info = True)
-		exit()
+		logger.error('MAIN - There was an error reading your config file.', exc_info=True)
+		
+	try:
+		if parser.has_section('ini_version'):
+			logger.info('MAIN - CONFIG_READ - ini_version section present.')
+			section_ini_version = True
+			config_file_version = int(parser.get('ini_version', 'version'))
+		else:
+			logger.info('MAIN - CONFIG_READ - ini_version section not present.')
+			section_ini_version = False
+			config_file_version = 0
+		logger.info('MAIN - CONFIG_READ - Config file version: {}'.format(config_file_version))
+		if parser.has_section('database'):
+			logger.info('MAIN - CONFIG_READ - database section present.')
+			section_database = True
+		else:
+			logger.info('MAIN - CONFIG_READ - database section not present.')
+			section_database = False
+		if parser.has_section('ISY'):
+			logger.info('MAIN - CONFIG_READ - ISY section present.')
+			section_isy = True
+		else:
+			logger.info('MAIN - CONFIG_READ - ISY section not present.')
+			section_isy = False
+		if parser.has_section('openHAB'):
+			logger.info('MAIN - CONFIG_READ - openHAB section present.')
+			section_openhab = True
+		else:
+			logger.info('MAIN - CONFIG_READ - openHAB section not present.')
+			section_openhab = False
+		if parser.has_section('iCloudAPI'):
+			logger.info('MAIN - CONFIG_READ - iCloudAPI section present.')
+			section_icloudapi = True
+		else:
+			logger.info('MAIN - CONFIG_READ - iCloudAPI section not present.')
+			section_icloudapi = False
+		if parser.has_section('device'):
+			logger.info('MAIN - CONFIG_READ - device section present.')
+			section_device = True
+		else:
+			logger.info('MAIN - CONFIG_READ - device section not present.')
+			section_device = False
+		if parser.has_section('general'):
+			logger.info('MAIN - CONFIG_READ - general section present.')
+			section_general = True
+		else:
+			logger.info('MAIN - CONFIG_READ - general section not present.')
+			section_general = False
+	except:
+		logger.error('MAIN - CONFIG_READ - There was an error checking for sections in your config file.', exc_info=True)
+		pass
 	
-	### Read ISY configuration:	
-	try:
-		### Grab the ISY connection settings:
-		global isy_conf
-		isy_conf = {}
-		isy_conf['username'] = parser.get('ISY', 'username')
-		isy_conf['password'] = parser.get('ISY', 'password')
-		isy_conf['hostname'] = parser.get('ISY', 'hostname')
-		isy_conf['port'] = int(parser.get('ISY', 'port'))
-		isy_conf['SSL'] = parser.getboolean('ISY', 'SSL')
-		logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
-	except:
-		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [ISY] section. You may need to start wiith a new .ini \
-					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
-					 Exiting!', exc_info = True)
-		exit()
+	if section_ini_version == False and config_file_version < 3:
+		logger.info('MAIN - CONFIG_READ - You are currently not on the configuration version control system.')
+		logger.info('MAIN - CONFIG_READ - The script will read your current config items, rename your old .ini file and create a ' +
+					'new version controlled file with all of your current settings and set you on version 3 of the config file.')
+		config_file_version = 3
+		### Read database configuration:
+		if section_database == True:
+			try:
+				global db_conf
+				db_conf = {}
+				db_conf['name'] = parser.get('database', 'database')
+				db_conf['host'] = parser.get('database', 'host')
+				db_conf['port'] = int(parser.get('database', 'port'))
+				db_conf['user'] = parser.get('database', 'user')
+				db_conf['passwd'] = parser.get('database', 'passwd')
+				logger.debug('MAIN - db_conf: {}'.format(db_conf))
+			except:
+				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [database] section. You may need to start wiith a new .ini \
+							 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+							 Exiting!', exc_info = True)
+				exit(1)
+		else:
+			logger.error('MAIN - You need to have a fully complete [database] section of your current .ini file.')
+			exit(1)
+				
+		### Read ISY configuration:
+		if section_isy == True:
+			try:
+				### Grab the ISY connection settings:
+				global isy_conf
+				isy_conf = {}
+				isy_conf['username'] = parser.get('ISY', 'username')
+				isy_conf['password'] = parser.get('ISY', 'password')
+				isy_conf['hostname'] = parser.get('ISY', 'hostname')
+				isy_conf['port'] = int(parser.get('ISY', 'port'))
+				isy_conf['SSL'] = parser.getboolean('ISY', 'SSL')
+				logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
+			except:
+				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [ISY] section. You may need to start wiith a new .ini \
+							 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+							 Exiting!', exc_info = True)
+				exit(1)
+		else:
+			logger.error('MAIN - You need to have a fully complete [ISY] section of your current .ini file.')
+			exit(1)
+	
+		### Read openHAB configuration:
+		global openhab_conf
+		if section_openhab == True:
+			try:
+				### Grab the ISY connection settings:
+				openhab_conf = {}
+				openhab_conf['enabled'] = parser.getboolean('openHAB', 'enabled')
+				openhab_conf['authentication'] = parser.getboolean('openHAB', 'authentication')
+				openhab_conf['username'] = parser.get('openHAB', 'username')
+				openhab_conf['password'] = parser.get('openHAB', 'password')
+				openhab_conf['hostname'] = parser.get('openHAB', 'hostname')
+				openhab_conf['port'] = int(parser.get('openHAB', 'port'))
+				openhab_conf['SSL'] = parser.getboolean('openHAB', 'SSL')
+				openhab_conf['item_name'] = parser.get('openHAB', 'item_name')
+				logger.debug('MAIN - openhab_conf: {}'.format(openhab_conf))	
+			except:
+				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [openHAB] section. You may need to start wiith a new .ini \
+							 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+							 Exiting!', exc_info = True)
+				exit(1)
+		else:
+			logger.info('MAIN - You do not have a current [openHAB] section of your .ini file. A new one with defualt values will be added for you.')	
+			openhab_conf = {}
+			openhab_conf['enabled'] = False
+			openhab_conf['authentication'] = False
+			openhab_conf['username'] = 'myusername'
+			openhab_conf['password'] = 'mypassword'
+			openhab_conf['hostname'] = '111.222.333.444'
+			openhab_conf['port'] = 8080
+			openhab_conf['SSL'] = False
+			openhab_conf['item_name'] = 'My_Distance_Item_Name'
+			logger.debug('MAIN - openhab_conf: {}'.format(openhab_conf))
+	
+		### Read the iCloud configuration:
+		if section_icloudapi == True:
+			try:
+				### Grab the iCloud API authentication settings:
+				global icloudapi_conf
+				icloudapi_conf = {}
+				icloudapi_conf['username'] = parser.get('iCloudAPI', 'username')
+				icloudapi_conf['password'] = parser.get('iCloudAPI', 'password')
+				logger.debug('MAIN - icloudapi_conf: {}'.format(icloudapi_conf))
+			except:
+				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [iCloudAPI] section. You may need to start wiith a new .ini \
+							 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+							 Exiting!', exc_info = True)
+				exit(1)
+		else:
+			logger.error('MAIN - You need to have a fully complete [iCloudAPI] section of your current .ini file.')
+			exit(1)
+	
+		### Read the device settings:
+		if section_device == True:
+			try:
+				global device_conf
+				device_conf = {}
+				device_conf['name'] = parser.get('device', 'name')
+				device_conf['shortname'] = parser.get('device', 'shortname')
+				device_conf['WiFiCheck'] = parser.getboolean('device', 'WiFiCheck')
+				device_conf['BTCheck'] = parser.getboolean('device', 'BTCheck')
+				device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
+				device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
+				device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
+				device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
+				device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
+				device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
+				device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
+				device_conf['location_home_long'] = parser.get('device', 'location_home_long')
+				logger.debug('MAIN - device_conf: {}'.format(device_conf))
+			except:
+				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [device] section. You may need to start wiith a new .ini \
+							 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+							 Exiting!', exc_info = True)
+				exit(1)
+		else:
+			logger.error('MAIN - You need to have a fully complete [device] section of your current .ini file.')
+			exit(1)
+			
+		### Read the general program options:
+		if section_general ==True:
+			try:
+				### Grab general options:
+				global general_conf
+				general_conf = {}
+				general_conf['numberofdevices'] = int(parser.get('general', 'numberofdevices'))
+				general_conf['cycle_sleep_default'] = float(parser.get('general', 'cycle_sleep_default'))
+				general_conf['cycle_sleep_withradio'] = float(parser.get('general', 'cycle_sleep_withradio'))
+				general_conf['cycle_sleep_distance'] = float(parser.get('general', 'cycle_sleep_distance'))
+				general_conf['cycle_sleep_variable_distance'] = float(parser.get('general', 'cycle_sleep_variable_distance'))
+				general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
+				general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
+				general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
+				general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
+				general_conf['isold_reject'] = parser.getboolean('general', 'isold_reject')
+				general_conf['isold_retries'] = int(parser.get('general', 'isold_retries'))
+				general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))	
+				general_conf['gpsfromcell_reject'] = parser.getboolean('general', 'gpsfromcell_reject')
+				general_conf['gpsfromcell_retries'] = int(parser.get('general', 'gpsfromcell_retries'))
+				general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))	
+				general_conf['battery_check'] = parser.getboolean('general', 'battery_check')
+				general_conf['battery_threshold'] = int(parser.get('general', 'battery_threshold'))
+				general_conf['battery_sleep'] = int(parser.get('general', 'battery_sleep'))		
+				general_conf['battery_retries'] = int(parser.get('general', 'battery_retries'))
+				general_conf['battery_retries_sleep'] = int(parser.get('general', 'battery_retries_sleep'))
+				general_conf['gps_recheck'] = parser.getboolean('general', 'gps_recheck')
+				general_conf['gps_recheck_time'] = int(parser.get('general', 'gps_recheck_time'))
+				### Fill in default values for new settings not preset in the configuration file:
+				general_conf['battery_isy_reporting'] = False
+				general_conf['battery_isy_variable'] = 0
+				logger.debug('MAIN - general_conf: {}'.format(general_conf))
+			except:
+				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
+							 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+							 Exiting!', exc_info = True)
+				exit(1)
+		else:
+			logger.error('MAIN - You need to have a fully complete [general] section of your current .ini file.')
+			exit(1)
 
-	### Read the iCloud configuration:
-	try:
-		### Grab the iCloud API authentication settings:
-		global icloudapi_conf
-		icloudapi_conf = {}
-		icloudapi_conf['username'] = parser.get('iCloudAPI', 'username')
-		icloudapi_conf['password'] = parser.get('iCloudAPI', 'password')
-		logger.debug('MAIN - icloudapi_conf: {}'.format(icloudapi_conf))
-	except:
-		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [iCloudAPI] section. You may need to start wiith a new .ini \
-					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
-					 Exiting!', exc_info = True)
-		exit()
+		### Attempt to write out a new ini file and if complete, backup the old one and rename and use the new one.
+		try:
+			logger.info('MAIN - Attempting to upgrade your configuration file.')
+			f_out = open('./conf/iphonelocation.ini.temp', 'w', 0)
+			execfile('./iphonelocation.ini.tmpl')
+			f_out.flush
+			f_out.close
+			logger.info('MAIN - A new configuration file was created properly, it will be moved into place and your old file backed up.')
+			new_ini = True
+		except:
+			logger.error('MAIN - An attempt to upgrade your configuration file has failed. The script will continue with the current file.', exc_info=True)
+			new_ini = False
 
-	### Read the general program options:
-	try:
-		### Grab general options:
-		global general_conf
-		general_conf = {}
-		general_conf['numberofdevices'] = int(parser.get('general', 'numberofdevices'))
-		general_conf['cycle_sleep_default'] = float(parser.get('general', 'cycle_sleep_default'))
-		general_conf['cycle_sleep_withradio'] = float(parser.get('general', 'cycle_sleep_withradio'))
-		general_conf['cycle_sleep_distance'] = float(parser.get('general', 'cycle_sleep_distance'))
-		general_conf['cycle_sleep_variable_distance'] = float(parser.get('general', 'cycle_sleep_variable_distance'))
-		general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
-		general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
-		general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
-		general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
-		general_conf['isold_reject'] = parser.getboolean('general', 'isold_reject')
-		general_conf['isold_retries'] = int(parser.get('general', 'isold_retries'))
-		general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))	
-		general_conf['gpsfromcell_reject'] = parser.getboolean('general', 'gpsfromcell_reject')
-		general_conf['gpsfromcell_retries'] = int(parser.get('general', 'gpsfromcell_retries'))
-		general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))	
-		general_conf['battery_check'] = parser.getboolean('general', 'battery_check')
-		general_conf['battery_threshold'] = int(parser.get('general', 'battery_threshold'))
-		general_conf['battery_sleep'] = int(parser.get('general', 'battery_sleep'))
+		### If the new ini file was created properly, backup the old one, rename the new one, restart the app with the new file.
+		if new_ini == True:
+			ini_file_backupname = 'iphonelocation.ini.{}'.format(int(time.time()))
+			os.rename('./conf/iphonelocation.ini', './conf/{}'.format(ini_file_backupname))
+			logger.info('MAIN - Your old configuration file was renamed to: {}'.format(ini_file_backupname))
+			os.rename('./conf/iphonelocation.ini.temp', './conf/iphonelocation.ini')
+			logger.info('MAIN - Your new configuration file has been put in place, the script will now restart.')
+			program_restart()
+
+	elif section_ini_version == True:
+		logger.info('MAIN - CONFIG_READ - You are on the version controlled configuration file system and your current .ini file version is: {}'.format(config_file_version))
+		config_errors = False
+		if config_file_version == 3:
+			logger.debug('MAIN - Reading configuration settings for version 3 of the .ini file.')
+			### Read database configuration:
+			if section_database == True:
+				try:
+					db_conf = {}
+					db_conf['name'] = parser.get('database', 'database')
+					db_conf['host'] = parser.get('database', 'host')
+					db_conf['port'] = int(parser.get('database', 'port'))
+					db_conf['user'] = parser.get('database', 'user')
+					db_conf['passwd'] = parser.get('database', 'passwd')
+					logger.debug('MAIN - db_conf: {}'.format(db_conf))
+				except:
+					logger.error('MAIN - Error reading settings from iphonelocation.ini in your [database] section. You may need to start wiith a new .ini \
+								 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+								 Exiting!', exc_info = True)
+					config_errors = True
+			else:
+				logger.error('MAIN - You need to have a fully complete [database] section of your current .ini file.')
+				config_errors == True
+					
+			### Read ISY configuration:
+			if section_isy == True:
+				try:
+					### Grab the ISY connection settings:
+					isy_conf = {}
+					isy_conf['username'] = parser.get('ISY', 'username')
+					isy_conf['password'] = parser.get('ISY', 'password')
+					isy_conf['hostname'] = parser.get('ISY', 'hostname')
+					isy_conf['port'] = int(parser.get('ISY', 'port'))
+					isy_conf['SSL'] = parser.getboolean('ISY', 'SSL')
+					logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
+				except:
+					logger.error('MAIN - Error reading settings from iphonelocation.ini in your [ISY] section. You may need to start wiith a new .ini \
+								 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+								 Exiting!', exc_info = True)
+					config_errors == True
+			else:
+				logger.error('MAIN - You need to have a fully complete [ISY] section of your current .ini file.')
+				config_errors == True
 		
-		general_conf['battery_retries'] = int(parser.get('general', 'battery_retries'))
-		general_conf['battery_retries_sleep'] = int(parser.get('general', 'battery_retries_sleep'))
-		general_conf['gps_recheck'] = parser.getboolean('general', 'gps_recheck')
-		general_conf['gps_recheck_time'] = int(parser.get('general', 'gps_recheck_time'))
+			### Read openHAB configuration:
+			if section_openhab == True:
+				try:
+					### Grab the ISY connection settings:
+					openhab_conf = {}
+					openhab_conf['enabled'] = parser.getboolean('openHAB', 'enabled')
+					openhab_conf['authentication'] = parser.getboolean('openHAB', 'authentication')
+					openhab_conf['username'] = parser.get('openHAB', 'username')
+					openhab_conf['password'] = parser.get('openHAB', 'password')
+					openhab_conf['hostname'] = parser.get('openHAB', 'hostname')
+					openhab_conf['port'] = int(parser.get('openHAB', 'port'))
+					openhab_conf['SSL'] = parser.getboolean('openHAB', 'SSL')
+					openhab_conf['item_name'] = parser.get('openHAB', 'item_name')
+					logger.debug('MAIN - openhab_conf: {}'.format(openhab_conf))	
+				except:
+					logger.error('MAIN - Error reading settings from iphonelocation.ini in your [openHAB] section. You may need to start wiith a new .ini \
+								 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+								 Exiting!', exc_info = True)
+					config_errors == True
+			else:
+				logger.error('MAIN - You need to have a fully complete [openHAB] section of your current .ini file.')
+				config_errors == True
+
+			### Read the iCloud configuration:
+			if section_icloudapi == True:
+				try:
+					### Grab the iCloud API authentication settings:
+					icloudapi_conf = {}
+					icloudapi_conf['username'] = parser.get('iCloudAPI', 'username')
+					icloudapi_conf['password'] = parser.get('iCloudAPI', 'password')
+					logger.debug('MAIN - icloudapi_conf: {}'.format(icloudapi_conf))
+				except:
+					logger.error('MAIN - Error reading settings from iphonelocation.ini in your [iCloudAPI] section. You may need to start wiith a new .ini \
+								 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+								 Exiting!', exc_info = True)
+					config_errors == True
+			else:
+				logger.error('MAIN - You need to have a fully complete [iCloudAPI] section of your current .ini file.')
+				config_errors == True
 		
-		logger.debug('MAIN - general_conf: {}'.format(general_conf))
-	except:
-		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
-					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
-					 Exiting!', exc_info = True)
-		exit()
-	try:
-		### Grab the device settings:
-		global device_conf
-		device_conf = {}
-		device_conf['name'] = parser.get('device', 'name')
-		device_conf['shortname'] = parser.get('device', 'shortname')
-		device_conf['WiFiCheck'] = parser.getboolean('device', 'WiFiCheck')
-		device_conf['BTCheck'] = parser.getboolean('device', 'BTCheck')
-		device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
-		device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
-		device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
-		device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
-		device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
-		device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
-		device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
-		device_conf['location_home_long'] = parser.get('device', 'location_home_long')
-		logger.debug('MAIN - device_conf: {}'.format(device_conf))
-	except:
-		logger.error('MAIN - Error reading settings from iphonelocation.ini in your [device] section. You may need to start wiith a new .ini \
-					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
-					 Exiting!', exc_info = True)
-		exit()
+			### Read the device settings:
+			if section_device == True:
+				try:
+					device_conf = {}
+					device_conf['name'] = parser.get('device', 'name')
+					device_conf['shortname'] = parser.get('device', 'shortname')
+					device_conf['WiFiCheck'] = parser.getboolean('device', 'WiFiCheck')
+					device_conf['BTCheck'] = parser.getboolean('device', 'BTCheck')
+					device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
+					device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
+					device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
+					device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
+					device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
+					device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
+					device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
+					device_conf['location_home_long'] = parser.get('device', 'location_home_long')
+					logger.debug('MAIN - device_conf: {}'.format(device_conf))
+				except:
+					logger.error('MAIN - Error reading settings from iphonelocation.ini in your [device] section. You may need to start wiith a new .ini \
+								 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+								 Exiting!', exc_info = True)
+					config_errors == True
+			else:
+				logger.error('MAIN - You need to have a fully complete [device] section of your current .ini file.')
+				config_errors == True
+				
+			### Read the general program options:
+			if section_general ==True:
+				try:
+					### Grab general options:
+					general_conf = {}
+					general_conf['numberofdevices'] = int(parser.get('general', 'numberofdevices'))
+					general_conf['cycle_sleep_default'] = float(parser.get('general', 'cycle_sleep_default'))
+					general_conf['cycle_sleep_withradio'] = float(parser.get('general', 'cycle_sleep_withradio'))
+					general_conf['cycle_sleep_distance'] = float(parser.get('general', 'cycle_sleep_distance'))
+					general_conf['cycle_sleep_variable_distance'] = float(parser.get('general', 'cycle_sleep_variable_distance'))
+					general_conf['cycle_sleep_variable_modifier_default'] = float(parser.get('general', 'cycle_sleep_variable_modifier_default'))
+					general_conf['cycle_sleep_variable_modifier_inbound'] = float(parser.get('general', 'cycle_sleep_variable_modifier_inbound'))
+					general_conf['isy_distance_precision'] = int(parser.get('general', 'isy_distance_precision'))
+					general_conf['isy_distance_multiplier'] = int(parser.get('general', 'isy_distance_multiplier'))
+					general_conf['isold_reject'] = parser.getboolean('general', 'isold_reject')
+					general_conf['isold_retries'] = int(parser.get('general', 'isold_retries'))
+					general_conf['isold_sleep'] = int(parser.get('general', 'isold_sleep'))	
+					general_conf['gpsfromcell_reject'] = parser.getboolean('general', 'gpsfromcell_reject')
+					general_conf['gpsfromcell_retries'] = int(parser.get('general', 'gpsfromcell_retries'))
+					general_conf['gpsfromcell_sleep'] = int(parser.get('general', 'gpsfromcell_sleep'))	
+					general_conf['battery_check'] = parser.getboolean('general', 'battery_check')
+					general_conf['battery_threshold'] = int(parser.get('general', 'battery_threshold'))
+					general_conf['battery_sleep'] = int(parser.get('general', 'battery_sleep'))		
+					general_conf['battery_retries'] = int(parser.get('general', 'battery_retries'))
+					general_conf['battery_retries_sleep'] = int(parser.get('general', 'battery_retries_sleep'))
+					general_conf['gps_recheck'] = parser.getboolean('general', 'gps_recheck')
+					general_conf['gps_recheck_time'] = int(parser.get('general', 'gps_recheck_time'))
+					general_conf['battery_isy_reporting'] = parser.getboolean('general', 'battery_isy_reporting')
+					general_conf['battery_isy_variable'] = int(parser.get('general', 'battery_isy_variable'))
+					logger.debug('MAIN - general_conf: {}'.format(general_conf))
+				except:
+					logger.error('MAIN - Error reading settings from iphonelocation.ini in your [general] section. You may need to start wiith a new .ini \
+								 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
+								 Exiting!', exc_info = True)
+					config_errors == True
+			else:
+				logger.error('MAIN - You need to have a fully complete [general] section of your current .ini file.')
+				config_errors == True
+
+		### If any configuration errors were found, dump out.
+		if config_errors == True:
+			logger.error('MAIN - You have configuration errors, please check your .ini file or start with a new one from the iphonelocation.ini.sample file')	
+			exit(1)
+
 except:
-	logger.error('MAIN - Error reading settings from iphonelocation.ini. You may need to start wiith a new .ini \
-					 file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. \
-					 Exiting!', exc_info = True)
-	exit()
+	logger.error('MAIN - Error reading settings from iphonelocation.ini. You may need to start wiith a new .ini file by copying iphonelocation.ini.sample to iphonelocation.ini and moving all your setting over again. Exiting!', exc_info = True)
+	exit(1)
+
 ### Connect to MySQL database for logging:
 try:
 	db = pw.MySQLDatabase(db_conf['name'], host=db_conf['host'], port=db_conf['port'], user=db_conf['user'], passwd=db_conf['passwd'])
@@ -308,7 +623,7 @@ global api_last_used_time
 api_last_used_time = None
 #
 global app_version_running
-app_version_running = '0.17.2'
+app_version_running = '0.18.0'
 global app_version_current
 app_version_current = None
 global app_version_check_time
@@ -491,13 +806,58 @@ def isy_variable(action, var_type, var_number, value):
 	except:
 		logger.warn("ISY_VARIABLE - Failed!", exc_info=True)
 		return 1, -1
-### Function to automatically restart the application if some unrecoverable error occurs:
-def program_restart():
-	logger.info('RESTART - Executing restart...')
-	logger.debug('RESTART - Pause for 10 seconds to settle.')
-	time.sleep(10)
-	python = sys.executable
-	os.execl(python, python, * sys.argv)
+### Fuction that gets and sets ISY variable values:
+def openhab(value):
+	try:
+		logger.debug("OPENHAB - Running...")
+		max_attempts = 3
+		attempt = 1
+		
+		while attempt <= max_attempts:
+			logger.debug('OPENHAB - Attempt {} of {} to up the openHAB REST API.'.format(attempt, max_attempts))
+			### Set the URL protocol type:
+			if openhab_conf['SSL'] == True:
+				url_prefix = 'https'
+			elif openhab_conf['SSL'] == False:
+				url_prefix = 'http'
+			else:
+				logger.warn('OPENHAB - Could not determine ISY SSL or NOT, assuming HTTP.')
+				url_prefix = 'http'
+			
+			### Set the URL appropriately if openHAB authentication is being used.
+			if openhab_conf['authentication'] == True:
+				#http://localhost:8080/rest/items/SMC_Distance_From_Home/state
+				theurl = '{}://{}:{}@{}:{}/rest/items/{}/state'.format(
+					url_prefix, openhab_conf['username'], openhab_conf['password'], openhab_conf['hostname'], openhab_conf['port'], openhab_conf['item_name'])
+			elif openhab_conf['authentication'] == False:
+				theurl = '{}://{}:{}/rest/items/{}/state'.format(
+					url_prefix, openhab_conf['hostname'], openhab_conf['port'], openhab_conf['item_name'])
+			
+			logger.debug('OPENHAB - Sending openHAB a distance of: {}'.format(value))
+			
+			### Put the data into openHAB
+			response = requests.put(theurl,
+									data=str(value),
+									headers={'content-type':'text/plain'}
+									)
+			
+			logger.debug('OPENHAB - openHAB REST API response status code: {}'.format(response.status_code))
+			
+			### Check the response status, if it's 202 return, if not retry:
+			if response.status_code == 202:
+				logger.debug("OPENHAB - Completed")
+				return 0
+			else:
+				logger.debug('OPENHAB - The openHAB REST API did not return a valid response code, retrying.')
+				attempt = attempt + 1
+		
+		logger.warn('OPENHAB - the openHAB REST API was not updated properly in 3 attempts, giving up.')
+		return 1
+	except:
+		logger.warn("OPENHAB - Failed!", exc_info=True)
+		return 1
+
+
 ### Fuction to authenticate to the iCloud API:
 def api_login():
 	try:
@@ -726,6 +1086,9 @@ def device_data_read():
 					elif general_conf['gpsfromcell_reject'] == False and iPhone_Location['positionType'] != 'Cell':
 						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
 						isfromcell_pass = True
+					elif general_conf['gpsfromcell_reject'] == False and iPhone_Location['positionType'] == 'Cell':
+						logger.debug('DEVICE_DATA_READ - Location data from API is not from "Cell", continuing.')
+						isfromcell_pass = True
 					### If the data doesn't match any of our "fromCell" validation conditions, warn us and return anyway:
 					else:
 						logger.warn('DEVICE_DATA_READ - Location data did not match any "from Cell" validation conditions, continuing anyway.')
@@ -793,6 +1156,11 @@ def device_battery_level():
 			### Validate the data:
 			if Device_Battery_Level >= 1 and Device_Battery_Level <= 100:
 				logger.debug('DEVICE_BATTERY_LEVEL - Got a valid battery level of: {}%, returning.'.format(Device_Battery_Level))
+				if general_conf['battery_isy_reporting'] == True:
+					logger.debug('DEVICE_BATTERY_LEVEL - Battery level reporting to the ISY is enabled.')
+					isy_variable('set', 'state', general_conf['battery_isy_variable'], Device_Battery_Level)
+				else:
+					logger.debug('DEVICE_BATTERY_LEVEL - Battery level reporting to the ISY is not enabled')
 				return 0, Device_Battery_Level
 				### The line below was added to be uncommented for testing battery threshold
 				#return 0, 15
@@ -873,6 +1241,10 @@ def version_check():
 			return
 	except:
 		logger.warn('VERSION_CHECK - Failed checking for app updates!', exc_info=True)
+		app_version_is_current = None
+		app_version_update_url = 'Version check failed. This is normal if you are running a dev/non-master release.'
+		app_version_check_time = datetime.datetime.now()
+		
 
 ############################################################################################################
 ## THREAD DEFINITIONS                                                                                      #
@@ -966,6 +1338,16 @@ while True:
 				
 				### Determine the distance in miles between the iPhone and "Home"
 				distance_home = vincenty(location_home, location_phone).miles
+				
+				### Always deliver the distance with it's full precision to openHAB
+				if openhab_conf['enabled'] == True:
+					exit_code = openhab(distance_home)
+					if exit_code != 0:
+						logger.warn('MAIN - There was an error reporting the distance to openHAB')
+					elif exit_code == 0:
+						logger.debug('MAIN - openHAB was sent new distance data successfully.')
+				else:
+					logger.debug('MAIN - openHAB is not enabled.')
 			
 				### Store the distance to home with precision
 				if general_conf['isy_distance_precision'] == 0 and general_conf['isy_distance_multiplier'] == 0:
